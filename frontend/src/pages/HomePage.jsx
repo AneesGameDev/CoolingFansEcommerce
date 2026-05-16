@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Wind, Zap, Shield, Star, ChevronRight, Truck } from "lucide-react";
+import { Wind, Zap, Shield, Star, ChevronRight, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import ProductCard from "../components/ProductCard";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const WHY_BUY = [
+  { icon: Plane, title: "Directly Imported", desc: "Premium-grade imported fans, not local copies. Real quality, real performance.", color: "from-sky-400 to-blue-500" },
+  { icon: Truck, title: "1-2 Day Delivery", desc: "Lightning-fast nationwide delivery across Pakistan. Free shipping on orders over Rs. 2000.", color: "from-amber-400 to-orange-500" },
+  { icon: Shield, title: "7-Day Check Warranty", desc: "Open the box, test the fan, only pay if you're 100% happy.", color: "from-green-400 to-emerald-500" },
+  { icon: RotateCcw, title: "Easy Returns", desc: "Not satisfied? No questions asked. Return-back policy active for every order.", color: "from-rose-400 to-pink-500" },
+  { icon: BadgeCheck, title: "COD Only", desc: "Pay cash on delivery — no advance payment, no online fraud risk.", color: "from-violet-400 to-purple-500" },
+  { icon: Zap, title: "Long Battery", desc: "Rechargeable fans with up to 20-hour battery, perfect for load-shedding.", color: "from-yellow-400 to-amber-500" },
+];
 
 export default function HomePage() {
   const [products, setProducts] = useState([]);
@@ -12,7 +22,7 @@ export default function HomePage() {
 
   useEffect(() => {
     axios.get(`${API}/products`)
-      .then(r => setProducts(r.data))
+      .then((r) => setProducts(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -36,18 +46,18 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5 border border-white/30">
-              <Zap className="w-4 h-4 fill-current" />
-              Summer Sale 2024 — Up to 80% OFF!
+              <BadgeCheck className="w-4 h-4 fill-current" />
+              Pakistan's #1 Imported Fan Store
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-5 leading-tight" data-testid="hero-title">
-              Stay Cool This
+              Beat the Heat with
               <br />
-              <span className="text-amber-300">Summer Season</span>
+              <span className="text-amber-300">Premium Quality</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-sky-100 mb-8 leading-relaxed">
-              Premium portable fans — Neck fans, Baby fans &amp; Travel fans with long battery life. Cash on Delivery available!
+              Directly imported neck fans, baby fans & travel fans — long battery, 7-day warranty, Cash on Delivery!
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -56,7 +66,7 @@ export default function HomePage() {
                 className="bg-white text-sky-600 font-bold px-8 py-3.5 rounded-full hover:bg-sky-50 transition-all active:scale-95 shadow-lg inline-flex items-center justify-center gap-2"
                 data-testid="shop-now-btn"
               >
-                Shop Now
+                Shop Summer Sale
                 <ChevronRight className="w-4 h-4" />
               </a>
               <a
@@ -66,18 +76,17 @@ export default function HomePage() {
                 className="bg-green-400 hover:bg-green-500 text-white font-bold px-8 py-3.5 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
                 data-testid="whatsapp-hero-btn"
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
+                <MessageCircle className="w-5 h-5" />
                 Chat on WhatsApp
               </a>
             </div>
 
             {/* Trust Badges */}
-            <div className="flex flex-wrap justify-center gap-4 mt-8 text-white/80 text-sm">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-8 text-white/90 text-sm">
               <div className="flex items-center gap-1.5"><Truck className="w-4 h-4" /> Cash on Delivery</div>
-              <div className="flex items-center gap-1.5"><Shield className="w-4 h-4" /> 7-Day Return</div>
-              <div className="flex items-center gap-1.5"><Star className="w-4 h-4 fill-current text-amber-300" /> 4.8/5 Rating</div>
+              <div className="flex items-center gap-1.5"><Shield className="w-4 h-4" /> 7-Day Check Warranty</div>
+              <div className="flex items-center gap-1.5"><RotateCcw className="w-4 h-4" /> Return Back Policy</div>
+              <div className="flex items-center gap-1.5"><Package className="w-4 h-4" /> Delivery in 1-2 Days</div>
             </div>
           </div>
         </div>
@@ -86,8 +95,8 @@ export default function HomePage() {
       {/* Summer Sale Banner */}
       <div className="bg-gradient-to-r from-red-500 to-amber-500 text-white py-3 overflow-hidden" data-testid="sale-banner">
         <div className="flex animate-pulse items-center justify-center gap-8 flex-wrap px-4">
-          <span className="font-black text-sm sm:text-base whitespace-nowrap">🌡️ SUMMER SALE</span>
-          <span className="font-bold text-sm whitespace-nowrap">FREE DELIVERY on orders above Rs. 2000</span>
+          <span className="font-black text-sm sm:text-base whitespace-nowrap">🌡️ SUMMER SALE — UP TO 80% OFF</span>
+          <span className="font-bold text-sm whitespace-nowrap">FREE DELIVERY on orders over Rs. 2000</span>
           <span className="font-black text-sm sm:text-base whitespace-nowrap">Limited Stock!</span>
         </div>
       </div>
@@ -121,7 +130,7 @@ export default function HomePage() {
           <h2 className="text-3xl sm:text-4xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Our Fan Collection
           </h2>
-          <p className="text-slate-500 mt-2">10 premium fans — all with Summer discounts!</p>
+          <p className="text-slate-500 mt-2">10 premium imported fans — all with Summer discounts!</p>
         </div>
 
         {loading ? (
@@ -146,6 +155,53 @@ export default function HomePage() {
         )}
       </section>
 
+      {/* Why Buy With Us */}
+      <section className="bg-white border-y border-sky-100 py-14" data-testid="why-buy-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <div className="inline-block bg-amber-100 text-amber-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
+              Why CoolBreeze PK
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Why Buy With Us?
+            </h2>
+            <p className="text-slate-500 mt-2 max-w-2xl mx-auto">We import premium fans directly — no middlemen, no compromises. Just real quality at the best Pakistani prices.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {WHY_BUY.map((b, i) => (
+              <div
+                key={i}
+                className="group bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-2xl p-5 hover:shadow-lg hover:border-sky-200 transition-all"
+                data-testid={`why-buy-${i}`}
+              >
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${b.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                  <b.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-black text-slate-900 mb-1.5" style={{ fontFamily: 'Outfit, sans-serif' }}>{b.title}</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">{b.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/track"
+              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+              data-testid="cta-track"
+            >
+              <Package className="w-4 h-4" /> Track Your Order
+            </Link>
+            <a
+              href="#products"
+              className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-7 py-3 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+            >
+              Browse All Fans <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* WhatsApp CTA Section */}
       <section className="bg-green-50 border-y border-green-100 py-10">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -160,9 +216,7 @@ export default function HomePage() {
             className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3.5 rounded-full transition-all shadow-lg hover:shadow-xl active:scale-95"
             data-testid="whatsapp-cta-btn"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
+            <MessageCircle className="w-5 h-5" />
             Chat on WhatsApp
           </a>
         </div>
@@ -178,8 +232,8 @@ export default function HomePage() {
               </div>
               <span className="text-white font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>CoolBreeze PK</span>
             </div>
-            <p className="text-sm text-center">Cash on Delivery | WhatsApp: +92-300-0000000 | Pakistan</p>
-            <p className="text-sm">&copy; 2024 CoolBreeze PK. All rights reserved.</p>
+            <p className="text-sm text-center">Pakistan's #1 Imported Fan Store • Cash on Delivery • WhatsApp: +92-300-0000000</p>
+            <p className="text-sm">&copy; 2024 CoolBreeze PK</p>
           </div>
         </div>
       </footer>

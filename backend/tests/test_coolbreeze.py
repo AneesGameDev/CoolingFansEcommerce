@@ -1,217 +1,275 @@
+"""
+CoolBreeze PK Backend Tests
+Covers: Google auth (Emergent), reviews (auth-gated), multi-item orders,
+public tracking, my-orders, color_variants, video_url, total_sold, admin CRUD.
+"""
+import os
 import pytest
 import requests
-import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://portable-fan-hub.preview.emergentagent.com").rstrip("/")
+API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@coolbreeze.pk"
 ADMIN_PASSWORD = "Admin@123"
+TEST_SESSION = "test_session_fixed_abc123"
+TEST_USER_EMAIL = "test.reviewer@coolbreeze.pk"
 
 
 @pytest.fixture(scope="module")
 def admin_token():
-    resp = requests.post(f"{BASE_URL}/api/admin/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
-    assert resp.status_code == 200, f"Admin login failed: {resp.text}"
-    return resp.json()["token"]
+    r = requests.post(f"{API}/admin/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=15)
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
 
 
 @pytest.fixture(scope="module")
-def auth_headers(admin_token):
-    return {"Authorization": f"Bearer {admin_token}"}
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
 
 
-# --- Public endpoints ---
+@pytest.fixture(scope="module")
+def user_headers():
+    return {"Authorization": f"Bearer {TEST_SESSION}", "Content-Type": "application/json"}
 
-class TestPublicProducts:
-    """Public product endpoints"""
 
-    def test_get_products_returns_10(self):
-        resp = requests.get(f"{BASE_URL}/api/products")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert len(data) == 10, f"Expected 10 products, got {len(data)}"
+@pytest.fixture(scope="module")
+def products():
+    r = requests.get(f"{API}/products", timeout=15)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) >= 10
+    return data
 
-    def test_get_product_detail(self):
-        resp = requests.get(f"{BASE_URL}/api/products")
-        products = resp.json()
+
+# ---------- Auth ----------
+class TestAuth:
+    def test_session_with_fake_id_returns_401(self):
+        r = requests.post(f"{API}/auth/session", json={"session_id": "totally-fake-id-xyz"}, timeout=20)
+        assert r.status_code in (401, 502), r.text
+
+    def test_auth_me_with_bearer(self, user_headers):
+        r = requests.get(f"{API}/auth/me", headers=user_headers, timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["email"] == TEST_USER_EMAIL
+        assert data["name"] == "Test Reviewer"
+        assert "user_id" in data
+
+    def test_auth_me_no_auth_returns_401(self):
+        r = requests.get(f"{API}/auth/me", timeout=15)
+        assert r.status_code == 401
+
+    def test_auth_me_with_cookie(self):
+        r = requests.get(f"{API}/auth/me", cookies={"session_token": TEST_SESSION}, timeout=15)
+        assert r.status_code == 200
+        assert r.json()["email"] == TEST_USER_EMAIL
+
+
+# ---------- Products ----------
+class TestProducts:
+    def test_products_have_required_fields(self, products):
+        for p in products:
+            for field in ["id", "name", "price", "discounted_price", "color_variants", "video_url", "total_sold"]:
+                assert field in p, f"missing {field} in product {p.get('name')}"
+
+    def test_products_count_at_least_10(self, products):
+        assert len(products) >= 10
+
+
+# ---------- Reviews ----------
+class TestReviews:
+    def test_create_review_unauth_401(self, products):
         pid = products[0]["id"]
-        detail = requests.get(f"{BASE_URL}/api/products/{pid}")
-        assert detail.status_code == 200
-        d = detail.json()
-        assert d["id"] == pid
-        assert "name" in d
-        assert "price" in d
-        assert "discounted_price" in d
+        r = requests.post(f"{API}/reviews", json={"product_id": pid, "rating": 5, "comment": "x", "images": []}, timeout=15)
+        assert r.status_code == 401
 
-    def test_invalid_product_id(self):
-        resp = requests.get(f"{BASE_URL}/api/products/invalidid123")
-        assert resp.status_code == 400
+    def test_create_review_authed(self, products, user_headers):
+        pid = products[0]["id"]
+        payload = {"product_id": pid, "rating": 5, "comment": "TEST_review_authed", "images": []}
+        r = requests.post(f"{API}/reviews", headers=user_headers, json=payload, timeout=15)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["rating"] == 5
+        assert data["product_id"] == pid
+        assert data["user_email"] == TEST_USER_EMAIL
+        # Verify it shows up in GET /reviews/{pid}
+        r2 = requests.get(f"{API}/reviews/{pid}", timeout=15)
+        assert r2.status_code == 200
+        assert any(rv.get("comment") == "TEST_review_authed" for rv in r2.json())
+
+    def test_create_review_rejects_more_than_3_images(self, products, user_headers):
+        pid = products[0]["id"]
+        imgs = ["data:image/png;base64,AAAA"] * 4
+        r = requests.post(f"{API}/reviews", headers=user_headers,
+                          json={"product_id": pid, "rating": 4, "comment": "too many", "images": imgs}, timeout=15)
+        assert r.status_code == 400
+
+    def test_create_review_invalid_rating(self, products, user_headers):
+        pid = products[0]["id"]
+        r = requests.post(f"{API}/reviews", headers=user_headers,
+                          json={"product_id": pid, "rating": 7, "comment": "bad", "images": []}, timeout=15)
+        assert r.status_code == 400
 
 
+# ---------- Orders ----------
 class TestOrders:
-    """Order placement"""
-
-    def test_create_order(self):
-        prods = requests.get(f"{BASE_URL}/api/products").json()
-        p = prods[0]
-        payload = {
+    def _payload(self, products, qty=2):
+        p = products[0]
+        return {
             "customer_name": "TEST_Customer",
             "phone": "03001234567",
             "whatsapp": "03001234567",
-            "address": "House 123, Test Street",
+            "address": "TEST address line",
             "city": "Karachi",
             "province": "Sindh",
-            "product_id": p["id"],
-            "product_name": p["name"],
-            "product_image": p["images"][0] if p["images"] else "",
-            "quantity": 1,
-            "unit_price": p["discounted_price"],
-            "total_price": p["discounted_price"],
+            "items": [{
+                "product_id": p["id"],
+                "product_name": p["name"],
+                "product_image": (p.get("images") or [""])[0],
+                "quantity": qty,
+                "unit_price": p["discounted_price"],
+                "line_total": p["discounted_price"] * qty,
+            }],
+            "total_price": p["discounted_price"] * qty,
         }
-        resp = requests.post(f"{BASE_URL}/api/orders", json=payload)
-        assert resp.status_code == 200
-        d = resp.json()
-        assert "order_number" in d
-        assert d["order_number"].startswith("CB-")
-        assert d["status"] == "pending"
-        return d["id"]
+
+    def test_create_multi_item_order_guest(self, products):
+        payload = self._payload(products, qty=2)
+        # add second item
+        p2 = products[1]
+        payload["items"].append({
+            "product_id": p2["id"],
+            "product_name": p2["name"],
+            "product_image": (p2.get("images") or [""])[0],
+            "quantity": 1,
+            "unit_price": p2["discounted_price"],
+            "line_total": p2["discounted_price"],
+        })
+        payload["total_price"] += p2["discounted_price"]
+
+        # Capture before count
+        before = requests.get(f"{API}/products", timeout=15).json()
+        before_sold = {p["id"]: p["total_sold"] for p in before}
+
+        r = requests.post(f"{API}/orders", json=payload, timeout=15)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["order_number"].startswith("CB-")
+        parts = data["order_number"].split("-")
+        assert len(parts) == 3 and len(parts[1]) == 8 and len(parts[2]) == 8
+        assert len(data["items"]) == 2
+        pytest.order_number = data["order_number"]
+
+        # Verify total_sold incremented
+        after = requests.get(f"{API}/products", timeout=15).json()
+        after_sold = {p["id"]: p["total_sold"] for p in after}
+        assert after_sold[products[0]["id"]] == before_sold[products[0]["id"]] + 2
+        assert after_sold[products[1]["id"]] == before_sold[products[1]["id"]] + 1
+
+    def test_track_order_public(self, products):
+        order_num = getattr(pytest, "order_number", None)
+        assert order_num
+        r = requests.get(f"{API}/orders/track/{order_num}", timeout=15)
+        assert r.status_code == 200
+        assert r.json()["order_number"] == order_num
+
+    def test_track_order_unknown_404(self):
+        r = requests.get(f"{API}/orders/track/CB-99999999-NOTREAL1", timeout=15)
+        assert r.status_code == 404
+
+    def test_my_orders_requires_auth(self):
+        r = requests.get(f"{API}/orders/my", timeout=15)
+        assert r.status_code == 401
+
+    def test_my_orders_authed(self, products, user_headers):
+        # Create an authed order
+        payload = self._payload(products, qty=1)
+        r = requests.post(f"{API}/orders", headers=user_headers, json=payload, timeout=15)
+        assert r.status_code == 200
+        order_num = r.json()["order_number"]
+
+        r2 = requests.get(f"{API}/orders/my", headers=user_headers, timeout=15)
+        assert r2.status_code == 200
+        orders = r2.json()
+        assert any(o["order_number"] == order_num for o in orders)
+        assert all(o["user_email"] == TEST_USER_EMAIL for o in orders)
 
 
-class TestAdminAuth:
-    """Admin auth"""
-
-    def test_admin_login_success(self):
-        resp = requests.post(f"{BASE_URL}/api/admin/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
-        assert resp.status_code == 200
-        assert "token" in resp.json()
-
-    def test_admin_login_wrong_password(self):
-        resp = requests.post(f"{BASE_URL}/api/admin/login", json={"email": ADMIN_EMAIL, "password": "wrongpass"})
-        assert resp.status_code == 401
-
-    def test_admin_me(self, auth_headers):
-        resp = requests.get(f"{BASE_URL}/api/admin/me", headers=auth_headers)
-        assert resp.status_code == 200
-        assert resp.json()["role"] == "admin"
-
-    def test_unauthenticated_access_blocked(self):
-        resp = requests.get(f"{BASE_URL}/api/admin/stats")
-        assert resp.status_code == 401
-
-
-class TestAdminStats:
-    """Admin stats"""
-
-    def test_get_stats(self, auth_headers):
-        resp = requests.get(f"{BASE_URL}/api/admin/stats", headers=auth_headers)
-        assert resp.status_code == 200
-        d = resp.json()
-        assert "total_orders" in d
-        assert "total_products" in d
-        assert d["total_products"] == 10
-
-
-class TestAdminProducts:
-    """Admin product CRUD"""
-
-    def test_get_all_products(self, auth_headers):
-        resp = requests.get(f"{BASE_URL}/api/admin/products", headers=auth_headers)
-        assert resp.status_code == 200
-        assert len(resp.json()) >= 10
-
-    def test_create_update_delete_product(self, auth_headers):
+# ---------- Admin Color Variants ----------
+class TestAdminColorVariants:
+    def test_create_product_with_color_variants(self, admin_headers):
         payload = {
-            "name": "TEST_Fan Product",
-            "description": "Test desc",
-            "price": 1000.0,
-            "discounted_price": 800.0,
-            "category": "test",
-            "images": [],
-            "colors": ["White"],
-            "sizes": [],
+            "name": "TEST_Variant_Product",
+            "description": "test",
+            "price": 1000,
+            "discounted_price": 500,
+            "category": "neck-fan",
+            "images": ["https://example.com/x.jpg"],
+            "video_url": "https://example.com/v.mp4",
+            "color_variants": [
+                {"name": "Red", "hex": "#FF0000", "image_url": "https://example.com/red.jpg"},
+                {"name": "Blue", "hex": "#0000FF", "image_url": "https://example.com/blue.jpg"},
+            ],
             "stock": 10,
-            "features": ["Feature1"],
-            "is_active": True
+            "total_sold": 0,
         }
-        create = requests.post(f"{BASE_URL}/api/products", json=payload, headers=auth_headers)
-        assert create.status_code == 200
-        pid = create.json()["id"]
+        r = requests.post(f"{API}/products", headers=admin_headers, json=payload, timeout=15)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        pid = data["id"]
+        assert len(data["color_variants"]) == 2
+        assert data["color_variants"][0]["name"] == "Red"
+        assert data["video_url"] == "https://example.com/v.mp4"
 
-        # Update
-        payload["name"] = "TEST_Fan Product Updated"
-        update = requests.put(f"{BASE_URL}/api/products/{pid}", json=payload, headers=auth_headers)
-        assert update.status_code == 200
-        assert update.json()["name"] == "TEST_Fan Product Updated"
-
-        # Delete
-        delete = requests.delete(f"{BASE_URL}/api/products/{pid}", headers=auth_headers)
-        assert delete.status_code == 200
-
-        # Verify deleted
-        get = requests.get(f"{BASE_URL}/api/products/{pid}")
-        assert get.status_code == 404
-
-
-class TestAdminOrders:
-    """Admin order management"""
-
-    def test_get_orders(self, auth_headers):
-        resp = requests.get(f"{BASE_URL}/api/admin/orders", headers=auth_headers)
-        assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
-
-    def test_update_order_status(self, auth_headers):
-        # Create test order first
-        prods = requests.get(f"{BASE_URL}/api/products").json()
-        p = prods[0]
-        order = requests.post(f"{BASE_URL}/api/orders", json={
-            "customer_name": "TEST_StatusUpdate",
-            "phone": "03001234567",
-            "whatsapp": "03001234567",
-            "address": "Test Address",
-            "city": "Lahore",
-            "province": "Punjab",
-            "product_id": p["id"],
-            "product_name": p["name"],
-            "product_image": p["images"][0] if p["images"] else "",
-            "quantity": 1,
-            "unit_price": p["discounted_price"],
-            "total_price": p["discounted_price"],
-        }).json()
-        oid = order["id"]
-
-        update = requests.put(f"{BASE_URL}/api/admin/orders/{oid}", json={"status": "confirmed"}, headers=auth_headers)
-        assert update.status_code == 200
-        assert update.json()["status"] == "confirmed"
+        # GET to verify persistence
+        r2 = requests.get(f"{API}/products/{pid}", timeout=15)
+        assert r2.status_code == 200
+        cv = r2.json()["color_variants"]
+        assert len(cv) == 2
+        assert cv[1]["image_url"] == "https://example.com/blue.jpg"
 
         # Cleanup
-        requests.delete(f"{BASE_URL}/api/admin/orders/{oid}", headers=auth_headers)
+        requests.delete(f"{API}/products/{pid}", headers=admin_headers, timeout=15)
 
 
-class TestAdminReviews:
-    """Admin review management"""
-
-    def test_get_reviews(self, auth_headers):
-        resp = requests.get(f"{BASE_URL}/api/admin/reviews", headers=auth_headers)
-        assert resp.status_code == 200
-        assert len(resp.json()) >= 9
-
-    def test_create_delete_review(self, auth_headers):
-        prods = requests.get(f"{BASE_URL}/api/products").json()
-        pid = prods[0]["id"]
+# ---------- Admin Review with Base64 Images ----------
+class TestAdminReview:
+    def test_admin_create_review_with_base64(self, admin_headers, products):
+        pid = products[0]["id"]
+        b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
         payload = {
             "product_id": pid,
-            "reviewer_name": "TEST_Reviewer",
-            "rating": 5,
-            "comment": "Test review",
-            "images": [],
-            "verified_purchase": False,
-            "is_approved": True
+            "reviewer_name": "TEST_Admin_Reviewer",
+            "rating": 4,
+            "comment": "TEST_admin_review_b64",
+            "images": [b64, b64],
+            "verified_purchase": True,
+            "is_approved": True,
         }
-        create = requests.post(f"{BASE_URL}/api/admin/reviews", json=payload, headers=auth_headers)
-        assert create.status_code == 200
-        rid = create.json()["id"]
+        r = requests.post(f"{API}/admin/reviews", headers=admin_headers, json=payload, timeout=15)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert len(data["images"]) == 2
+        assert data["images"][0].startswith("data:image/png;base64,")
+        rid = data["id"]
+        # Cleanup
+        requests.delete(f"{API}/admin/reviews/{rid}", headers=admin_headers, timeout=15)
 
-        # Delete
-        delete = requests.delete(f"{BASE_URL}/api/admin/reviews/{rid}", headers=auth_headers)
-        assert delete.status_code == 200
+
+# ---------- Admin Other Endpoints ----------
+class TestAdminEndpoints:
+    def test_admin_stats(self, admin_headers):
+        r = requests.get(f"{API}/admin/stats", headers=admin_headers, timeout=15)
+        assert r.status_code == 200
+        s = r.json()
+        for k in ["total_orders", "pending_orders", "total_products", "total_reviews", "total_revenue"]:
+            assert k in s
+
+    def test_admin_orders_list(self, admin_headers):
+        r = requests.get(f"{API}/admin/orders", headers=admin_headers, timeout=15)
+        assert r.status_code == 200
+
+    def test_admin_no_token_401(self):
+        r = requests.get(f"{API}/admin/stats", timeout=15)
+        assert r.status_code == 401

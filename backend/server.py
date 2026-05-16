@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request, Response, Cookie
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -9,9 +9,10 @@ import os
 import logging
 import bcrypt
 import jwt
+import httpx
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
 
@@ -66,11 +67,56 @@ def doc_to_dict(d):
     return d
 
 
+# ---- User Auth Helpers (Emergent Google Auth) ----
+
+async def get_current_user(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    session_token: Optional[str] = Cookie(None),
+):
+    """Returns the logged-in user or None. Use get_required_user for protected routes."""
+    token = None
+    if session_token:
+        token = session_token
+    elif authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+
+    if not token:
+        return None
+
+    session = await db.user_sessions.find_one({"session_token": token})
+    if not session:
+        return None
+
+    expires_at = session.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        return None
+
+    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    return user
+
+
+async def get_required_user(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required")
+    return user
+
+
 # ---- Models ----
 
 class AdminLogin(BaseModel):
     email: str
     password: str
+
+
+class ColorVariant(BaseModel):
+    name: str
+    hex: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class ProductCreate(BaseModel):
@@ -82,15 +128,28 @@ class ProductCreate(BaseModel):
     images: List[str] = []
     video_url: Optional[str] = None
     colors: List[str] = []
+    color_variants: List[ColorVariant] = []
     sizes: List[str] = []
     stock: int = 100
     battery_life: Optional[str] = None
     features: List[str] = []
     is_active: bool = True
+    total_sold: int = 0
 
 
 class ProductUpdate(ProductCreate):
     pass
+
+
+class OrderItem(BaseModel):
+    product_id: str
+    product_name: str
+    product_image: str
+    quantity: int = 1
+    selected_color: Optional[str] = None
+    selected_size: Optional[str] = None
+    unit_price: float
+    line_total: float
 
 
 class OrderCreate(BaseModel):
@@ -100,14 +159,8 @@ class OrderCreate(BaseModel):
     email: Optional[str] = None
     address: str
     city: str
-    province: str
-    product_id: str
-    product_name: str
-    product_image: str
-    quantity: int = 1
-    selected_color: Optional[str] = None
-    selected_size: Optional[str] = None
-    unit_price: float
+    province: Optional[str] = "Punjab"
+    items: List[OrderItem]
     total_price: float
     notes: Optional[str] = None
 
@@ -118,15 +171,23 @@ class OrderStatusUpdate(BaseModel):
 
 class ReviewCreate(BaseModel):
     product_id: str
+    rating: int
+    comment: str
+    images: List[str] = []   # base64 data URIs (up to 3)
+
+
+class AdminReviewCreate(BaseModel):
+    product_id: str
     reviewer_name: str
     rating: int
     comment: str
     images: List[str] = []
     verified_purchase: bool = False
-
-
-class ReviewUpdate(ReviewCreate):
     is_approved: bool = True
+
+
+class SessionExchange(BaseModel):
+    session_id: str
 
 
 # ---- Seed Data ----
@@ -140,40 +201,40 @@ SEED_PRODUCTS = [
             "https://images.unsplash.com/photo-1657537488218-f7eb744c5b0b?crop=entropy&cs=srgb&fm=jpg&w=500&q=80",
             "https://images.unsplash.com/photo-1776183422641-5dc7d7ab7d95?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"
         ],
-        "video_url": None, "colors": ["White", "Black", "Pink", "Blue"], "sizes": [],
+        "video_url": None, "colors": ["White", "Black", "Pink", "Blue"], "color_variants": [], "sizes": [],
         "stock": 150, "battery_life": "8-10 hours",
         "features": ["Bladeless Design", "3 Speed Settings", "USB-C Charging", "Ultra Quiet <35dB", "360° Airflow"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 248
     },
     {
         "name": "Baby Stroller Clip Fan",
         "description": "Whisper-quiet clip fan designed for baby strollers, cribs, and car seats. Safe protective grill design with 360° rotation. Keeps your baby cool all summer long.",
         "price": 2499, "discounted_price": 899, "category": "baby-fan",
         "images": ["https://images.unsplash.com/photo-1566441699339-0c7bac167c58?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["White", "Blue", "Pink"], "sizes": [],
+        "video_url": None, "colors": ["White", "Blue", "Pink"], "color_variants": [], "sizes": [],
         "stock": 200, "battery_life": "12 hours",
         "features": ["Baby Safe Design", "Super Quiet", "360° Rotation", "Strong Clip", "USB-C Powered"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 412
     },
     {
         "name": "USB Mini Desk Fan",
         "description": "Compact yet powerful USB desk fan with 5 wind speed settings. Flexible 360° tilt design. Ideal for home office, study table, and bedside. Extremely quiet for night use.",
         "price": 3299, "discounted_price": 1799, "category": "desk-fan",
         "images": ["https://images.unsplash.com/photo-1618941716939-553df3c6c278?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["White", "Black", "Blue"], "sizes": ["4-inch", "6-inch"],
+        "video_url": None, "colors": ["White", "Black", "Blue"], "color_variants": [], "sizes": ["4-inch", "6-inch"],
         "stock": 120, "battery_life": "USB Powered",
         "features": ["5 Speed Settings", "360° Tilt", "Quiet Operation", "USB Powered", "Compact Design"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 156
     },
     {
         "name": "Foldable Handheld Fan",
         "description": "Ultra-portable foldable mini fan that fits in your pocket or bag. Built-in 2000mAh battery with USB charging. 3 speed settings for personal cooling on the go. Perfect travel companion.",
         "price": 1999, "discounted_price": 799, "category": "handheld-fan",
         "images": ["https://images.unsplash.com/photo-1718815416565-c65944a5ec14?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["Pink", "White", "Black", "Gold"], "sizes": [],
+        "video_url": None, "colors": ["Pink", "White", "Black", "Gold"], "color_variants": [], "sizes": [],
         "stock": 300, "battery_life": "4-6 hours",
         "features": ["Foldable Design", "Pocket Size", "3 Speed Settings", "2000mAh Battery", "USB-C Charging"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 587
     },
     {
         "name": "Bladeless Neck Fan - Turbo",
@@ -183,40 +244,40 @@ SEED_PRODUCTS = [
             "https://images.unsplash.com/photo-1776183422641-5dc7d7ab7d95?crop=entropy&cs=srgb&fm=jpg&w=500&q=80",
             "https://images.unsplash.com/photo-1657537488218-f7eb744c5b0b?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"
         ],
-        "video_url": None, "colors": ["White", "Black", "Sky Blue"], "sizes": [],
+        "video_url": None, "colors": ["White", "Black", "Sky Blue"], "color_variants": [], "sizes": [],
         "stock": 80, "battery_life": "10-12 hours",
         "features": ["Turbo Mode", "4000mAh Battery", "4 Speed Settings", "USB-C Fast Charge", "Ergonomic Design"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 321
     },
     {
         "name": "Baby Night Cooling Fan",
         "description": "Ultra-silent baby room fan with built-in soft ambient night light. Whisper mode produces less than 25dB noise. Safety certified with fully enclosed blade guard. Perfect for peaceful baby sleep.",
         "price": 3999, "discounted_price": 2199, "category": "baby-fan",
         "images": ["https://images.unsplash.com/photo-1564510182791-29645da7fac4?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["White", "Pink"], "sizes": [],
+        "video_url": None, "colors": ["White", "Pink"], "color_variants": [], "sizes": [],
         "stock": 100, "battery_life": "USB Powered",
         "features": ["<25dB Whisper Mode", "Night Light", "Baby Safe", "3 Wind Speeds", "Timer Function"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 89
     },
     {
         "name": "10000mAh Travel Fan",
         "description": "High-capacity rechargeable fan with massive 10000mAh power bank. Charges your phone AND cools you simultaneously! 4 speed settings with turbo mode. Ideal for travel and load-shedding.",
         "price": 8999, "discounted_price": 4499, "category": "travel-fan",
         "images": ["https://images.unsplash.com/photo-1523437345381-db5ee4df9c04?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["Black", "Blue", "White"], "sizes": [],
+        "video_url": None, "colors": ["Black", "Blue", "White"], "color_variants": [], "sizes": [],
         "stock": 60, "battery_life": "16-20 hours",
         "features": ["10000mAh Battery", "Phone Charger", "Turbo Mode", "4 Speeds", "LED Battery Display"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 178
     },
     {
         "name": "Car Dashboard USB Fan",
         "description": "Powerful flexible neck car fan for dashboard use. Connects directly to car USB port. 360° adjustable neck design with silent motor. Keeps you cool while driving.",
         "price": 2999, "discounted_price": 1299, "category": "car-fan",
         "images": ["https://images.unsplash.com/photo-1565151443833-29bf2ba5dd8d?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["Black", "Silver", "White"], "sizes": [],
+        "video_url": None, "colors": ["Black", "Silver", "White"], "color_variants": [], "sizes": [],
         "stock": 180, "battery_life": "Car USB Powered",
         "features": ["360° Flexible Neck", "Silent Motor", "2 Speed Settings", "Plug & Play", "Universal USB"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 234
     },
     {
         "name": "Mini Tower Fan (5 Speeds)",
@@ -226,20 +287,20 @@ SEED_PRODUCTS = [
             "https://images.unsplash.com/photo-1618941716939-553df3c6c278?crop=entropy&cs=srgb&fm=jpg&w=500&q=80",
             "https://images.unsplash.com/photo-1566441699339-0c7bac167c58?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"
         ],
-        "video_url": None, "colors": ["White", "Gray"], "sizes": ["12-inch", "18-inch"],
+        "video_url": None, "colors": ["White", "Gray"], "color_variants": [], "sizes": ["12-inch", "18-inch"],
         "stock": 40, "battery_life": "8-15 hours",
         "features": ["Oscillation", "5 Speed Settings", "Sleep Timer", "6000mAh Battery", "Touch Controls"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 67
     },
     {
         "name": "Kids Cute Mini Fan",
         "description": "Adorable mini fan designed specially for children. Extra-safe soft blades with full protective cover. Lightweight and easy to hold. USB charging with 1500mAh battery. Perfect summer gift for kids!",
         "price": 1499, "discounted_price": 599, "category": "kids-fan",
         "images": ["https://images.unsplash.com/photo-1718815416565-c65944a5ec14?crop=entropy&cs=srgb&fm=jpg&w=500&q=80"],
-        "video_url": None, "colors": ["Pink", "Blue", "Yellow", "Green"], "sizes": [],
+        "video_url": None, "colors": ["Pink", "Blue", "Yellow", "Green"], "color_variants": [], "sizes": [],
         "stock": 250, "battery_life": "3-5 hours",
         "features": ["Safe Soft Blades", "Cute Design", "Lightweight", "1500mAh Battery", "Multiple Colors"],
-        "is_active": True, "order_count": 0
+        "is_active": True, "total_sold": 612
     }
 ]
 
@@ -260,8 +321,14 @@ SEED_REVIEWS = [
 async def startup_event():
     await db.products.create_index("is_active")
     await db.orders.create_index("created_at")
+    await db.orders.create_index("order_number")
+    await db.orders.create_index("user_email")
     await db.reviews.create_index("product_id")
     await db.admins.create_index("email", unique=True)
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("user_id", unique=True)
+    await db.user_sessions.create_index("session_token", unique=True)
+    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
 
     admin_email = os.environ.get('ADMIN_EMAIL', 'admin@coolbreeze.pk')
     admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin@123')
@@ -301,6 +368,94 @@ async def startup_event():
             if reviews_to_insert:
                 await db.reviews.insert_many(reviews_to_insert)
         logger.info(f"Seeded {len(SEED_PRODUCTS)} products and reviews")
+
+
+# ---- Google Auth (Emergent-managed) ----
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+
+@api_router.post("/auth/session")
+async def auth_session(data: SessionExchange, response: Response):
+    """Exchange Emergent session_id for our session_token. Stores user, sets httpOnly cookie."""
+    async with httpx.AsyncClient() as http:
+        try:
+            r = await http.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": data.session_id},
+                timeout=15.0,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Auth provider error: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid session_id")
+    payload = r.json()
+    email = payload.get("email")
+    name = payload.get("name", "")
+    picture = payload.get("picture", "")
+    session_token = payload.get("session_token")
+    if not email or not session_token:
+        raise HTTPException(status_code=400, detail="Incomplete provider response")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one({"email": email}, {"$set": {"name": name, "picture": picture}})
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        await db.users.insert_one({
+            "user_id": user_id,
+            "email": email,
+            "name": name,
+            "picture": picture,
+            "created_at": datetime.now(timezone.utc),
+        })
+
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "user_id": user_id,
+        "session_token": session_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        max_age=7 * 24 * 60 * 60,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+    )
+
+    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+
+
+@api_router.get("/auth/me")
+async def auth_me(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    # Strip mongo-internal/sensitive fields
+    return {
+        "user_id": user.get("user_id"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "picture": user.get("picture"),
+    }
+
+
+@api_router.post("/auth/logout")
+async def auth_logout(
+    response: Response,
+    session_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+):
+    token = session_token
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    if token:
+        await db.user_sessions.delete_one({"session_token": token})
+    response.delete_cookie("session_token", path="/", samesite="none", secure=True)
+    return {"message": "Logged out"}
 
 
 # ---- Admin Auth ----
@@ -348,7 +503,6 @@ async def create_product(data: ProductCreate, current_admin=Depends(get_admin_us
     doc = data.model_dump()
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-    doc["order_count"] = 0
     result = await db.products.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
@@ -381,18 +535,42 @@ async def delete_product(product_id: str, current_admin=Depends(get_admin_user))
 # ---- Orders ----
 
 @api_router.post("/orders")
-async def create_order(data: OrderCreate):
+async def create_order(data: OrderCreate, user=Depends(get_current_user)):
+    if not data.items or len(data.items) == 0:
+        raise HTTPException(status_code=400, detail="Cart is empty")
     doc = data.model_dump()
     doc["status"] = "pending"
     doc["order_number"] = f"CB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+    doc["user_email"] = user["email"] if user else (data.email or None)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     doc["updated_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.orders.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
-    if ObjectId.is_valid(data.product_id):
-        await db.products.update_one({"_id": ObjectId(data.product_id)}, {"$inc": {"order_count": 1}})
+    # Increment total_sold for each item
+    for item in data.items:
+        if ObjectId.is_valid(item.product_id):
+            await db.products.update_one(
+                {"_id": ObjectId(item.product_id)},
+                {"$inc": {"total_sold": item.quantity}}
+            )
     return doc
+
+
+@api_router.get("/orders/track/{order_number}")
+async def track_order(order_number: str):
+    """Public guest tracking by order number only."""
+    order = await db.orders.find_one({"order_number": order_number})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return doc_to_dict(order)
+
+
+@api_router.get("/orders/my")
+async def my_orders(user=Depends(get_required_user)):
+    """Logged-in users see their order history by email."""
+    orders = await db.orders.find({"user_email": user["email"]}).sort("created_at", -1).to_list(500)
+    return [doc_to_dict(o) for o in orders]
 
 
 @api_router.get("/admin/orders")
@@ -434,10 +612,23 @@ async def get_product_reviews(product_id: str):
 
 
 @api_router.post("/reviews")
-async def create_review(data: ReviewCreate):
-    doc = data.model_dump()
-    doc["created_at"] = datetime.now(timezone.utc).isoformat()
-    doc["is_approved"] = True
+async def create_review(data: ReviewCreate, user=Depends(get_required_user)):
+    """Only Google-logged-in users can submit reviews."""
+    if len(data.images) > 3:
+        raise HTTPException(status_code=400, detail="Max 3 images allowed")
+    if data.rating < 1 or data.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be 1-5")
+    doc = {
+        "product_id": data.product_id,
+        "reviewer_name": user.get("name") or user.get("email", "User"),
+        "user_email": user["email"],
+        "rating": data.rating,
+        "comment": data.comment,
+        "images": data.images,
+        "verified_purchase": False,
+        "is_approved": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
     result = await db.reviews.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
@@ -451,8 +642,10 @@ async def get_all_reviews(current_admin=Depends(get_admin_user)):
 
 
 @api_router.post("/admin/reviews")
-async def admin_create_review(data: ReviewUpdate, current_admin=Depends(get_admin_user)):
+async def admin_create_review(data: AdminReviewCreate, current_admin=Depends(get_admin_user)):
     doc = data.model_dump()
+    if len(doc.get("images", [])) > 3:
+        raise HTTPException(status_code=400, detail="Max 3 images allowed")
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.reviews.insert_one(doc)
     doc["id"] = str(result.inserted_id)
@@ -461,10 +654,12 @@ async def admin_create_review(data: ReviewUpdate, current_admin=Depends(get_admi
 
 
 @api_router.put("/admin/reviews/{review_id}")
-async def update_review(review_id: str, data: ReviewUpdate, current_admin=Depends(get_admin_user)):
+async def update_review(review_id: str, data: AdminReviewCreate, current_admin=Depends(get_admin_user)):
     if not ObjectId.is_valid(review_id):
         raise HTTPException(status_code=400, detail="Invalid review ID")
     update_data = data.model_dump()
+    if len(update_data.get("images", [])) > 3:
+        raise HTTPException(status_code=400, detail="Max 3 images allowed")
     result = await db.reviews.update_one({"_id": ObjectId(review_id)}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -516,10 +711,12 @@ async def get_admin_stats(current_admin=Depends(get_admin_user)):
 
 app.include_router(api_router)
 
+# Note: when allow_credentials=True we cannot use "*" for origins.
+# Allow all via regex which still permits credentials with all origins.
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_methods=["*"],
     allow_headers=["*"],
 )

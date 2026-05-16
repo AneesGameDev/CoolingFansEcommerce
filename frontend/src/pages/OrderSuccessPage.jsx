@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck } from "lucide-react";
+import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck, Search } from "lucide-react";
 
 export default function OrderSuccessPage() {
   const { state } = useLocation();
@@ -10,10 +10,12 @@ export default function OrderSuccessPage() {
     return null;
   }
 
-  const { order, product } = state;
+  const { order } = state;
+  const items = order.items || [];
 
+  const itemSummary = items.map((it) => `${it.product_name} (x${it.quantity})`).join(", ");
   const waMessage = encodeURIComponent(
-    `Hi CoolBreeze PK! I just placed an order.\n\nOrder #: ${order.order_number}\nProduct: ${order.product_name}\nQty: ${order.quantity}x\nTotal: Rs. ${order.total_price.toLocaleString()}\nName: ${order.customer_name}\nPhone: ${order.phone}\nAddress: ${order.address}, ${order.city}, ${order.province}`
+    `Hi CoolBreeze PK! I just placed an order.\n\nOrder #: ${order.order_number}\nItems: ${itemSummary}\nTotal: Rs. ${order.total_price.toLocaleString()}\nName: ${order.customer_name}\nPhone: ${order.phone}\nAddress: ${order.address}, ${order.city}${order.province ? `, ${order.province}` : ""}`
   );
 
   const statusColors = {
@@ -26,7 +28,6 @@ export default function OrderSuccessPage() {
   return (
     <div className="min-h-screen bg-[#F0F9FF] flex items-center justify-center px-4 py-12">
       <div className="max-w-lg w-full">
-        {/* Success Header */}
         <div className="text-center mb-6 animate-fade-in-up">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
             <CheckCircle className="w-10 h-10 text-green-500" />
@@ -37,7 +38,6 @@ export default function OrderSuccessPage() {
           <p className="text-slate-500">Thank you! Your order has been received successfully.</p>
         </div>
 
-        {/* Order Card */}
         <div className="bg-white rounded-2xl border border-sky-100 overflow-hidden mb-4 shadow-sm" data-testid="order-success-card">
           <div className="bg-sky-50 border-b border-sky-100 px-5 py-4 flex items-center justify-between">
             <div>
@@ -50,25 +50,24 @@ export default function OrderSuccessPage() {
           </div>
 
           <div className="p-5">
-            {/* Product */}
-            <div className="flex gap-3 mb-5 pb-5 border-b border-slate-100">
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-50 flex-shrink-0">
-                <img
-                  src={product?.images?.[0] || order.product_image}
-                  alt={order.product_name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=200"; }}
-                />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-sm">{order.product_name}</p>
-                {order.selected_color && <p className="text-xs text-slate-500">Color: {order.selected_color}</p>}
-                {order.selected_size && <p className="text-xs text-slate-500">Size: {order.selected_size}</p>}
-                <p className="text-xs text-slate-500">Qty: {order.quantity}</p>
-              </div>
+            {/* Items list */}
+            <div className="space-y-3 mb-5 pb-5 border-b border-slate-100">
+              {items.map((it, i) => (
+                <div key={i} className="flex gap-3" data-testid={`success-item-${i}`}>
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-50 flex-shrink-0">
+                    <img src={it.product_image} alt={it.product_name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-900 text-sm line-clamp-1">{it.product_name}</p>
+                    {it.selected_color && <span className="text-[10px] text-slate-500">Color: {it.selected_color}</span>}
+                    {it.selected_size && <span className="text-[10px] text-slate-500"> • Size: {it.selected_size}</span>}
+                    <p className="text-xs text-slate-500">Qty: {it.quantity}</p>
+                  </div>
+                  <p className="text-sm font-bold text-sky-600 self-center">Rs. {(it.line_total || it.unit_price * it.quantity).toLocaleString()}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Details */}
             <div className="space-y-2 text-sm mb-5">
               <div className="flex justify-between">
                 <span className="text-slate-500 flex items-center gap-1.5"><Package className="w-3.5 h-3.5" /> Customer</span>
@@ -83,8 +82,8 @@ export default function OrderSuccessPage() {
                 <span className="font-semibold text-slate-800">{order.whatsapp}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 flex items-center gap-1.5"><Truck className="w-3.5 h-3.5" /> City</span>
-                <span className="font-semibold text-slate-800">{order.city}, {order.province}</span>
+                <span className="text-slate-500 flex items-center gap-1.5"><Truck className="w-3.5 h-3.5" /> Location</span>
+                <span className="font-semibold text-slate-800 text-right">{order.city}{order.province ? `, ${order.province}` : ""}</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between font-black text-base">
                 <span className="text-slate-700">Total (COD)</span>
@@ -92,7 +91,6 @@ export default function OrderSuccessPage() {
               </div>
             </div>
 
-            {/* Steps */}
             <div className="bg-sky-50 rounded-xl p-4">
               <p className="text-xs font-bold text-sky-700 mb-3 uppercase tracking-wider">What happens next?</p>
               <div className="space-y-2">
@@ -114,7 +112,6 @@ export default function OrderSuccessPage() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="space-y-3">
           <a
             href={`https://wa.me/923000000000?text=${waMessage}`}
@@ -126,6 +123,15 @@ export default function OrderSuccessPage() {
             <MessageCircle className="w-5 h-5" />
             Confirm Order on WhatsApp
           </a>
+
+          <Link
+            to="/track"
+            className="w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
+            data-testid="track-this-order-btn"
+          >
+            <Search className="w-4 h-4" />
+            Track This Order
+          </Link>
 
           <Link
             to="/"

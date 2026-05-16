@@ -27,12 +27,14 @@ const STATUS_ICONS = { pending: AlertCircle, confirmed: CheckCircle, shipped: Tr
 
 const EMPTY_PRODUCT = {
   name: "", description: "", price: "", discounted_price: "", category: "neck-fan",
-  images: [""], video_url: "", colors: "", sizes: "", features: "", battery_life: "", stock: 100, is_active: true
+  images: "", video_url: "", colors: "", color_variants: [], sizes: "", features: "", battery_life: "", stock: 100, is_active: true
 };
 
 const EMPTY_REVIEW = {
-  product_id: "", reviewer_name: "", rating: 5, comment: "", images: "", verified_purchase: false, is_approved: true
+  product_id: "", reviewer_name: "", rating: 5, comment: "", images: [], verified_purchase: false, is_approved: true
 };
+
+const MAX_REVIEW_IMG_BYTES = 1.5 * 1024 * 1024;
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -113,6 +115,7 @@ export default function AdminDashboard() {
         ...product,
         images: product.images?.join("\n") || "",
         colors: product.colors?.join(", ") || "",
+        color_variants: product.color_variants || [],
         sizes: product.sizes?.join(", ") || "",
         features: product.features?.join(", ") || "",
         video_url: product.video_url || "",
@@ -127,16 +130,41 @@ export default function AdminDashboard() {
     setShowProductForm(true);
   };
 
+  const addColorVariant = () => {
+    setProductForm(p => ({ ...p, color_variants: [...(p.color_variants || []), { name: "", hex: "", image_url: "" }] }));
+  };
+  const updateColorVariant = (i, field, val) => {
+    setProductForm(p => ({
+      ...p,
+      color_variants: p.color_variants.map((cv, idx) => idx === i ? { ...cv, [field]: val } : cv)
+    }));
+  };
+  const removeColorVariant = (i) => {
+    setProductForm(p => ({ ...p, color_variants: p.color_variants.filter((_, idx) => idx !== i) }));
+  };
+
   const saveProduct = async (e) => {
     e.preventDefault();
     setSavingProduct(true);
     try {
+      const imageList = productForm.images.split("\n").map(s => s.trim()).filter(Boolean);
+      const variants = (productForm.color_variants || []).filter(cv => cv.name?.trim());
+      // Auto-merge variant image_urls into images list (so they're available as main images)
+      for (const cv of variants) {
+        if (cv.image_url && !imageList.includes(cv.image_url)) imageList.push(cv.image_url);
+      }
+      const colorsArr = productForm.colors.split(",").map(s => s.trim()).filter(Boolean);
+      // Auto-merge variant names into colors list
+      for (const cv of variants) {
+        if (cv.name && !colorsArr.includes(cv.name)) colorsArr.push(cv.name);
+      }
       const payload = {
         ...productForm,
         price: parseFloat(productForm.price),
         discounted_price: parseFloat(productForm.discounted_price),
-        images: productForm.images.split("\n").map(s => s.trim()).filter(Boolean),
-        colors: productForm.colors.split(",").map(s => s.trim()).filter(Boolean),
+        images: imageList,
+        colors: colorsArr,
+        color_variants: variants,
         sizes: productForm.sizes.split(",").map(s => s.trim()).filter(Boolean),
         features: productForm.features.split(",").map(s => s.trim()).filter(Boolean),
         video_url: productForm.video_url || null,
@@ -165,7 +193,7 @@ export default function AdminDashboard() {
   const openReviewForm = (review = null) => {
     if (review) {
       setEditingReview(review);
-      setReviewForm({ ...review, images: review.images?.join(", ") || "" });
+      setReviewForm({ ...review, images: review.images || [] });
     } else {
       setEditingReview(null);
       setReviewForm(EMPTY_REVIEW);
@@ -173,11 +201,29 @@ export default function AdminDashboard() {
     setShowReviewForm(true);
   };
 
+  const handleReviewImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if ((reviewForm.images?.length || 0) + files.length > 3) {
+      alert("Max 3 review images allowed");
+      return;
+    }
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > MAX_REVIEW_IMG_BYTES) { alert(`${file.name} too large (max 1.5MB)`); continue; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setReviewForm(p => p.images.length >= 3 ? p : { ...p, images: [...p.images, ev.target.result] });
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = "";
+  };
+
   const saveReview = async (e) => {
     e.preventDefault();
     setSavingReview(true);
     try {
-      const payload = { ...reviewForm, images: reviewForm.images.split(",").map(s => s.trim()).filter(Boolean) };
+      const payload = { ...reviewForm, images: reviewForm.images || [] };
       if (editingReview) {
         const res = await axios.put(`${API}/admin/reviews/${editingReview.id}`, payload, getConfig());
         setReviews(prev => prev.map(r => r.id === editingReview.id ? res.data : r));
@@ -358,7 +404,11 @@ export default function AdminDashboard() {
                       <span className="text-sky-400 font-mono text-xs font-bold w-36">{order.order_number}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-semibold text-sm truncate">{order.customer_name}</p>
-                        <p className="text-slate-400 text-xs truncate">{order.product_name}</p>
+                        <p className="text-slate-400 text-xs truncate">
+                          {order.items?.length > 0
+                            ? order.items.map(i => `${i.product_name} (x${i.quantity})`).join(", ")
+                            : order.product_name}
+                        </p>
                       </div>
                       <span className="text-white font-bold text-sm">Rs. {order.total_price?.toLocaleString()}</span>
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLORS[order.status] || ""}`}>
@@ -374,12 +424,24 @@ export default function AdminDashboard() {
                           <p className="text-slate-400">Phone: <span className="text-white">{order.phone}</span></p>
                           <p className="text-slate-400">WhatsApp: <span className="text-white">{order.whatsapp}</span></p>
                           <p className="text-slate-400">Address: <span className="text-white">{order.address}</span></p>
-                          <p className="text-slate-400">City: <span className="text-white">{order.city}, {order.province}</span></p>
-                          {order.selected_color && <p className="text-slate-400">Color: <span className="text-white">{order.selected_color}</span></p>}
-                          {order.selected_size && <p className="text-slate-400">Size: <span className="text-white">{order.selected_size}</span></p>}
-                          <p className="text-slate-400">Qty: <span className="text-white">{order.quantity}</span></p>
+                          <p className="text-slate-400">City: <span className="text-white">{order.city}{order.province ? `, ${order.province}` : ""}</span></p>
+                          {order.user_email && <p className="text-slate-400">User: <span className="text-sky-400">{order.user_email}</span></p>}
                           {order.notes && <p className="text-slate-400">Notes: <span className="text-white">{order.notes}</span></p>}
                           <p className="text-slate-400">Date: <span className="text-white">{new Date(order.created_at).toLocaleString()}</span></p>
+                          <div className="mt-2 pt-2 border-t border-slate-700">
+                            <p className="text-slate-400 mb-1 text-xs font-bold uppercase">Items:</p>
+                            {(order.items || [{
+                              product_name: order.product_name, quantity: order.quantity,
+                              selected_color: order.selected_color, selected_size: order.selected_size, line_total: order.total_price
+                            }]).map((it, i) => (
+                              <div key={i} className="text-xs text-slate-300 ml-2">
+                                • {it.product_name} (x{it.quantity})
+                                {it.selected_color ? ` • ${it.selected_color}` : ""}
+                                {it.selected_size ? ` • ${it.selected_size}` : ""}
+                                {it.line_total ? ` — Rs. ${it.line_total.toLocaleString()}` : ""}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="flex flex-col gap-3">
                           <div>
@@ -470,7 +532,7 @@ export default function AdminDashboard() {
                     <div className="p-4">
                       <p className="text-white font-bold text-sm line-clamp-1 mb-1">{p.name}</p>
                       <p className="text-sky-400 font-black text-sm">Rs. {p.discounted_price.toLocaleString()} <span className="text-slate-500 line-through font-normal">Rs. {p.price.toLocaleString()}</span></p>
-                      <p className="text-slate-400 text-xs mt-1">Stock: {p.stock} | Orders: {p.order_count || 0}</p>
+                      <p className="text-slate-400 text-xs mt-1">Stock: {p.stock} | Sold: {p.total_sold || 0}</p>
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => openProductForm(p)}
@@ -642,12 +704,42 @@ export default function AdminDashboard() {
                     className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                     data-testid="product-video-input" />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-slate-300 mb-1">Colors (comma separated)</label>
                   <input value={productForm.colors} onChange={e => setProductForm(p => ({ ...p, colors: e.target.value }))}
                     placeholder="White, Black, Pink, Blue"
                     className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                     data-testid="product-colors-input" />
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-semibold text-slate-300">Color Variants (with image URL)</label>
+                    <button type="button" onClick={addColorVariant}
+                      className="text-xs bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded-lg font-bold"
+                      data-testid="add-color-variant-btn">+ Add Variant</button>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-2">When a customer selects a color, the main image switches to its assigned image URL.</p>
+                  {productForm.color_variants?.length > 0 && (
+                    <div className="space-y-2">
+                      {productForm.color_variants.map((cv, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2 rounded-xl" data-testid={`color-variant-row-${i}`}>
+                          <input value={cv.name} onChange={e => updateColorVariant(i, "name", e.target.value)}
+                            placeholder="Color name (e.g. Pink)" className="col-span-3 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs" />
+                          <input value={cv.hex || ""} onChange={e => updateColorVariant(i, "hex", e.target.value)}
+                            placeholder="#FBA4C0" className="col-span-2 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs font-mono" />
+                          <div className="col-span-1 w-6 h-6 rounded-full border border-slate-600" style={{ backgroundColor: cv.hex || "#cbd5e1" }} />
+                          <input value={cv.image_url || ""} onChange={e => updateColorVariant(i, "image_url", e.target.value)}
+                            placeholder="https://image-url-for-this-color.jpg"
+                            className="col-span-5 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs" />
+                          <button type="button" onClick={() => removeColorVariant(i)}
+                            className="col-span-1 bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white rounded-lg p-1.5 flex items-center justify-center"
+                            aria-label="Remove">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-300 mb-1">Sizes (comma separated)</label>
@@ -735,10 +827,26 @@ export default function AdminDashboard() {
                   data-testid="review-comment-input" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1">Image URLs (comma separated)</label>
-                <input value={reviewForm.images} onChange={e => setReviewForm(p => ({ ...p, images: e.target.value }))}
-                  placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg"
-                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                <label className="block text-sm font-semibold text-slate-300 mb-1">Review Images (upload, max 3)</label>
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {(reviewForm.images || []).map((img, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-600">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={() => setReviewForm(p => ({ ...p, images: p.images.filter((_, idx) => idx !== i) }))}
+                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(reviewForm.images?.length || 0) < 3 && (
+                    <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-700 cursor-pointer transition-colors" data-testid="admin-review-image-upload">
+                      <Plus className="w-4 h-4" />
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleReviewImageUpload} />
+                    </label>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400">Upload up to 3 images (max 1.5MB each). Stored as base64.</p>
               </div>
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 text-sm text-slate-300">
