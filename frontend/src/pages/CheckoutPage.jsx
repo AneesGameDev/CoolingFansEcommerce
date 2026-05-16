@@ -17,6 +17,8 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
+  const [submitted, setSubmitted] = useState(false);
+
   const [form, setForm] = useState({
     customer_name: "",
     phone: "",
@@ -29,8 +31,8 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    if (items.length === 0) navigate("/");
-  }, [items.length, navigate]);
+    if (!submitted && items.length === 0) navigate("/");
+  }, [items.length, navigate, submitted]);
 
   useEffect(() => {
     if (user) {
@@ -78,8 +80,9 @@ export default function CheckoutPage() {
         total_price: total,
       };
       const res = await axios.post(`${API}/orders`, orderData, { withCredentials: true });
-      clear();
+      setSubmitted(true);
       navigate("/order-success", { state: { order: res.data } });
+      clear();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to place order. Please try again.");
     } finally {

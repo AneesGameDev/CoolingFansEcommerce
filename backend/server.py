@@ -368,6 +368,17 @@ async def startup_event():
             if reviews_to_insert:
                 await db.reviews.insert_many(reviews_to_insert)
         logger.info(f"Seeded {len(SEED_PRODUCTS)} products and reviews")
+    else:
+        # Backfill new schema fields for products created before schema additions
+        await db.products.update_many(
+            {"color_variants": {"$exists": False}}, {"$set": {"color_variants": []}}
+        )
+        await db.products.update_many(
+            {"video_url": {"$exists": False}}, {"$set": {"video_url": None}}
+        )
+        await db.products.update_many(
+            {"total_sold": {"$exists": False}}, {"$set": {"total_sold": 0}}
+        )
 
 
 # ---- Google Auth (Emergent-managed) ----

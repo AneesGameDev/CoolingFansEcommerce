@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck, Search } from "lucide-react";
 
@@ -5,10 +6,11 @@ export default function OrderSuccessPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
 
-  if (!state?.order) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!state?.order) navigate("/", { replace: true });
+  }, [state, navigate]);
+
+  if (!state?.order) return null;
 
   const { order } = state;
   const items = order.items || [];
