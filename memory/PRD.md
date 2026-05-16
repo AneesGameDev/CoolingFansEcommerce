@@ -1,82 +1,104 @@
 # CoolBreeze PK - E-Commerce Fan Website PRD
 
 ## Project Overview
-Complete e-commerce website for portable summer fans (Neck Fans, Baby Fans, Desk Fans, Travel Fans). Pakistani market focus with Cash on Delivery ordering.
+Complete e-commerce website for portable summer fans (Neck Fans, Baby Fans, Desk Fans, Travel Fans). Pakistani market focus with Cash on Delivery ordering, Google login for reviews, and full order tracking.
 
 ## Architecture
-- **Frontend**: React + TailwindCSS + Shadcn UI
+- **Frontend**: React + TailwindCSS + Shadcn UI + Sonner (toasts)
 - **Backend**: FastAPI (port 8001)
 - **Database**: MongoDB (coolbreeze_db)
+- **Auth**: Emergent-managed Google OAuth (review/order-history gate) + JWT (admin)
 - **Deployment**: Kubernetes (Emergent)
 
-## What's Been Implemented (v1.0 - 2026-05-16)
+## What's Been Implemented
 
-### Frontend Pages
-- **HomePage** (`/`) - Hero banner, summer sale strip, features section, 10-product grid with discount badges, WhatsApp CTA, footer
-- **ProductDetailPage** (`/product/:id`) - Image gallery, color/size selectors, quantity control, order button, reviews section, write review form
-- **CheckoutPage** (`/checkout`) - COD form with Name, Phone, WhatsApp, Email, Address, City, Province, Notes
-- **OrderSuccessPage** (`/order-success`) - Order number, order details, WhatsApp confirm button
-- **AdminLoginPage** (`/admin`) - JWT-based admin authentication
-- **AdminDashboard** (`/admin/dashboard`) - Full admin panel
+### v1.0 (2026-05-16) — MVP
+- Homepage, ProductDetailPage, single-item CheckoutPage, OrderSuccessPage
+- Admin Panel (Dashboard / Orders / Products / Reviews) with JWT auth
+- 10 seeded products, 9 seed reviews
+- WhatsApp CTA buttons
 
-### Admin Panel Features
-- Dashboard Overview (total orders, pending, revenue, products stats)
-- Orders Tab: List all orders, expand for details, change status (pending/confirmed/shipped/delivered/cancelled), WhatsApp button, delete
-- Products Tab: Grid view, Add/Edit/Delete products with full form (name, description, price, discounted price, category, images URLs, video URL, colors, sizes, features, battery life, stock, active toggle)
-- Reviews Tab: List all reviews, approve/hide toggle, edit, delete, add new review
+### v2.0 (2026-05-16) — 13-Feature Drop
+**Auth & Personalization**
+- Emergent Google OAuth integration (`/api/auth/session`, `/api/auth/me`, `/api/auth/logout`)
+- AuthContext + AuthCallback (synchronous session_id hash detection prevents race)
+- User dropdown in Header (My Orders, Track Order, Sign Out)
+- httpOnly secure cookie session_token, 7-day expiry
 
-### Backend APIs
-- `GET /api/products` - Public product listing (active only)
-- `GET /api/products/{id}` - Product detail
-- `POST /api/products` - Admin: add product
-- `PUT /api/products/{id}` - Admin: update product
-- `DELETE /api/products/{id}` - Admin: delete product
-- `POST /api/orders` - Public: place COD order
-- `GET /api/admin/orders` - Admin: all orders
-- `PUT /api/admin/orders/{id}` - Admin: update order status
-- `DELETE /api/admin/orders/{id}` - Admin: delete order
-- `GET /api/reviews/{product_id}` - Public: product reviews
-- `POST /api/reviews` - Public: submit review
-- `GET /api/admin/reviews` - Admin: all reviews
-- `POST /api/admin/reviews` - Admin: add review
-- `PUT /api/admin/reviews/{id}` - Admin: edit review
-- `DELETE /api/admin/reviews/{id}` - Admin: delete review
-- `PUT /api/admin/reviews/{id}/toggle` - Admin: approve/hide review
-- `GET /api/admin/stats` - Admin: dashboard statistics
-- `POST /api/admin/login` - Admin authentication
+**Cart & Checkout**
+- CartContext (localStorage persisted, `coolbreeze_cart_v1`)
+- Slide-out CartDrawer (Sheet) with qty +/-, remove, total, savings
+- Quick "+ Add to Cart" button on every product card
+- "Add to Cart" + "Order Now" buttons on ProductDetailPage
+- Multi-item COD checkout (items[]) with strict fields: Name, Phone, WhatsApp, Address, City/Location, Province
 
-### Seed Data
-- 10 products (Neck Fan, Baby Fan, Desk Fan, Handheld Fan, Bladeless Neck Fan, Baby Night Fan, Travel Fan, Car Fan, Tower Fan, Kids Fan)
-- 9 seed reviews distributed across products
-- Admin account seeded at startup
+**Product Enhancements**
+- `color_variants` field [{name, hex, image_url}] — main image swaps when a color is clicked
+- `video_url` field — "Watch Video" button overlay opens HTML5 video player
+- `total_sold` field — "X+ sold" badge on cards and PDP
+
+**Reviews**
+- Login-gated review form (Google sign-in required); auto-fills name/email
+- Up to 3 review images uploaded as base64 (1.5MB cap each)
+- Customer-facing image lightbox (click thumbnail → full-size dialog)
+- Admin can add/edit "fake" reviews with file-upload images (base64)
+
+**Order Tracking**
+- `/track` — public guest tracking by order number only
+- `/my-orders` — logged-in users see all orders linked to their email
+- Backend: `GET /api/orders/track/{order_number}`, `GET /api/orders/my`
+
+**Trust UI & Branding**
+- Hero: "Pakistan's #1 Imported Fan Store" + "Beat the Heat with Premium Quality"
+- "Why Buy With Us" section with 6 cards (Imported, 1-2 Day Delivery, 7-Day Check Warranty, Easy Returns, COD Only, Long Battery)
+- Trust strip on PDP (Delivery / Warranty / Returns)
+
+**Admin Panel Enhancements**
+- Color Variants editor (name + hex picker + image URL rows; add/remove)
+- File-upload review images (base64) replacing URL-list textarea
+- Multi-item order display (items[]) with backward-compat fallback
+
+### Migration & Schema Safety (v2.0)
+- Startup migration backfills `color_variants=[]`, `video_url=None`, `total_sold=0` on existing products
+- Old single-item orders deleted (clean cutover); new orders use items[]
 
 ## Admin Credentials
 - Email: admin@coolbreeze.pk
 - Password: Admin@123
 
+## Test Google Session (preview/testing)
+- session_token: `test_session_fixed_abc123`
+- user_id: `test-user-fixed-001`
+- email: `test.reviewer@coolbreeze.pk`
+- (Use cookie or Bearer header; re-seed in `/app/memory/test_credentials.md`)
+
 ## Design
-- Theme: Cool Blue (#0EA5E9) + White + Sky Blue (#F0F9FF background)
-- Sale badge: Amber (#F59E0B)
+- Theme: Sky Blue (#0EA5E9) + Sky Blue background (#F0F9FF) + White
+- Accent: Amber (#F59E0B) for sales / Add to Cart
 - Fonts: Outfit (headings) + Plus Jakarta Sans (body)
-- Mobile-first: 2-col product grid on mobile, 5-col on desktop
+- Mobile-first: 2-col products on mobile, 5-col desktop
 
-## Prioritized Backlog
+## Prioritized Backlog (v2.1+)
 
-### P0 (Critical - Next Steps)
-- [ ] Product image upload (file upload to cloud storage)
-- [ ] WhatsApp business number configuration (currently +923000000000)
+### P0
+- [ ] Replace placeholder WhatsApp `+923000000000` with real business number (env var: WHATSAPP_NUMBER)
+- [ ] Product image upload from admin (currently URL-only)
 
-### P1 (High Priority)
-- [ ] Order SMS/WhatsApp notifications when status changes
-- [ ] Product search and filter (by category, price range)
-- [ ] Coupon/discount code system
+### P1
+- [ ] Order SMS/WhatsApp notifications on status change
+- [ ] Product search & filter (category / price / stock)
+- [ ] Coupon / promo code system
+- [ ] Address book / saved addresses for logged-in users (re-fill at checkout)
 
-### P2 (Nice to Have)
-- [ ] Product stock management alerts
-- [ ] Analytics dashboard with charts
-- [ ] Multi-image upload from admin with drag-and-drop
-- [ ] Email confirmation on order
+### P2
+- [ ] Stock-alert low-inventory notifications
+- [ ] Analytics dashboard with revenue & top-product charts
+- [ ] Multi-image upload for products (drag-and-drop)
+- [ ] Email confirmation on order (Resend / SendGrid)
+- [ ] A11y: add `Description`/aria-describedby on Radix DialogContent (lightbox & modals)
+- [ ] Suppress unauth /auth/me 401 console error on initial load
 
-## Test Results (v1.0)
-- Backend: 100% (15/15 tests passed)
-- Frontend: 95% (1 bug found and auto-fixed by testing agent)
+## Test Results
+- **v1.0**: Backend 100% (15/15), Frontend 95% (1 auto-fix)
+- **v2.0 iter 2**: Backend 100% (20/20), Frontend 85% (1 CRITICAL nav bug)
+- **v2.0 iter 3 (post-fix)**: Backend 100%, Frontend 100% — all critical flows verified
