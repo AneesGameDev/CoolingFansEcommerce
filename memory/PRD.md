@@ -18,6 +18,32 @@ Complete e-commerce website for portable summer fans (Neck Fans, Baby Fans, Desk
 - 10 seeded products, 9 seed reviews
 - WhatsApp CTA buttons
 
+### v2.2 (2026-05-16) — Multi-Admin + Mobile + Carousel
+**Multi-Admin with Google Gating**
+- 3 shared admin accounts seeded: ockmicrosoft.games@gmail.com, tradebyabdul@gmail.com, royalu101@gmail.com (all password: `Anees@3221.`)
+- Admin button in Header HIDDEN until a Google-signed-in user's email is in `ALLOWED_ADMIN_EMAILS` (via /api/admin/check-access)
+- Forgot Password flow: enter Gmail → /api/admin/forgot-password sends 6-digit bcrypt-hashed code (15-min expiry, 5-attempt limit, brute-force protected) via Resend → enter code + new password (8+ char) → /api/admin/reset-password updates the hash
+- Resend integration: RESEND_API_KEY env var, asyncio.to_thread non-blocking send, anti-enumeration generic response
+- Note: Resend free sandbox only delivers to the account-owner email (`ockmicrosoft.games@gmail.com`). For the other 2 admins, verify a custom domain at resend.com/domains to enable real delivery
+
+**Mobile Optimization**
+- Compact hero on mobile: py-8 instead of py-16, smaller text-2xl headline, hidden hero subtitle, mini trust ribbon
+- Compact stats strip (4-col tiny) on mobile vs full version on tablet+
+- Products grid now visible after one short scroll (~705px in 844px viewport)
+
+**Auto-Sliding Testimonials Carousel**
+- CSS-only continuous left-loop via `animate-slide-left` keyframes (35s base; scales with item count)
+- Duplicated array for seamless wrap; pauses on hover (group-hover:[animation-play-state:paused])
+- Edge fades on both sides; supports unlimited testimonials
+
+**Admin Testimonials Editor**
+- New "Customer Testimonials" panel inside Site Content tab
+- Per-row fields: name, city, date (date picker), rating (1-5 stars), avatar URL, quote textarea
+- PUT /api/admin/testimonials bulk-replaces the list
+
+**Other**
+- Admin Review form datetime-local input restored (was missing in iter_4)
+
 ### v2.1 (2026-05-16) — Elite Branding + 8 Enhancements
 **Trust & Branding**
 - ❄️ Cooling animations on hero: drifting snowflakes, wind streams, frost overlay, animated radial spotlight, golden shimmer on "Premium Quality"
