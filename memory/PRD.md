@@ -18,6 +18,30 @@ Complete e-commerce website for portable summer fans (Neck Fans, Baby Fans, Desk
 - 10 seeded products, 9 seed reviews
 - WhatsApp CTA buttons
 
+### v2.1 (2026-05-16) — Elite Branding + 8 Enhancements
+**Trust & Branding**
+- ❄️ Cooling animations on hero: drifting snowflakes, wind streams, frost overlay, animated radial spotlight, golden shimmer on "Premium Quality"
+- 📊 Stats Strip (dark band, amber border): 50,000+ Happy Customers / 12,000+ Orders Delivered / 4.9/5 Rating / 100+ Cities Served
+- 🎫 Continuous-scroll animated sale ticker (animate-ticker)
+- 🛡️ "100% Satisfaction Guarantee" green banner with shield watermark
+- 💬 "Real Reviews from Real Homes" — 3 testimonial cards (admin-editable via featured_testimonials)
+- 🎤 Dark Founder Quote section with gradient blobs
+- 🎨 Bigger, bolder unique value text + elite footer
+
+**Admin Power**
+- ⚙️ "Site Content" admin tab — edit Brand / Hero / Sale Banner / Products section / Why Buy / Stats / Founder / Guarantee / WhatsApp CTA / Footer texts. PUT /api/admin/site-settings whitelists known keys.
+- 📅 Admin can set custom Review Date & Time (datetime-local input) when adding/editing reviews — perfect for backdating seeded testimonials
+
+**Stock Behavior**
+- 🚫 stock=0 → "SOLD OUT" overlay badge (red, rotated, -12deg) + grayscale image + disabled "Currently Sold Out" button on cards
+- 🚫 PDP: "Currently Sold Out" button replaces Add to Cart / Order Now; "Out of Stock — More coming soon!" notice
+
+**Guest → User Order Linking** (critical UX fix)
+- On checkout, order_number is saved to `localStorage.coolbreeze_guest_orders_v1`
+- Backend `POST /api/orders/link-guest` (auth required) — claims orders by number, sets user_email
+- AuthContext automatically calls link-guest after `/auth/me` resolves on login
+- Also: order creation auto-links to a registered user when the email field matches a known user
+
 ### v2.0 (2026-05-16) — 13-Feature Drop
 **Auth & Personalization**
 - Emergent Google OAuth integration (`/api/auth/session`, `/api/auth/me`, `/api/auth/logout`)

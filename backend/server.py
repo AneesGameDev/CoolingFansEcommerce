@@ -10,9 +10,12 @@ import logging
 import bcrypt
 import jwt
 import httpx
+import asyncio
+import resend
+import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import uuid
 
@@ -25,6 +28,15 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'coolbreeze_secret_2024')
 JWT_ALGORITHM = "HS256"
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '923000000000')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+ALLOWED_ADMIN_EMAILS = [
+    e.strip().lower() for e in os.environ.get('ALLOWED_ADMIN_EMAILS', '').split(',') if e.strip()
+]
+DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@123')
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -113,6 +125,16 @@ class AdminLogin(BaseModel):
     password: str
 
 
+class AdminForgotPassword(BaseModel):
+    email: EmailStr
+
+
+class AdminResetPassword(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
+
 class ColorVariant(BaseModel):
     name: str
     hex: Optional[str] = None
@@ -197,6 +219,19 @@ class LinkGuestOrders(BaseModel):
 
 class SiteSettingsUpdate(BaseModel):
     settings: dict
+
+
+class TestimonialItem(BaseModel):
+    name: str
+    city: Optional[str] = ""
+    rating: int = 5
+    quote: str
+    avatar: Optional[str] = ""
+    date: Optional[str] = ""
+
+
+class TestimonialsBulkUpdate(BaseModel):
+    testimonials: List[TestimonialItem]
 
 
 # ---- Default Site Settings ----
@@ -402,6 +437,19 @@ async def startup_event():
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.admins.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
 
+    # Seed the three allowed admin Gmail accounts with shared password
+    SHARED_ADMIN_PASSWORD = "Anees@3221."
+    for email in ALLOWED_ADMIN_EMAILS:
+        existing_a = await db.admins.find_one({"email": email})
+        if not existing_a:
+            await db.admins.insert_one({
+                "email": email,
+                "password_hash": hash_password(SHARED_ADMIN_PASSWORD),
+                "name": email.split("@")[0].title(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info(f"Allowed admin created: {email}")
+
     count = await db.products.count_documents({})
     if count == 0:
         now = datetime.now(timezone.utc).isoformat()
@@ -542,7 +590,8 @@ async def auth_logout(
 
 @api_router.post("/admin/login")
 async def admin_login(data: AdminLogin):
-    admin = await db.admins.find_one({"email": data.email})
+    email = data.email.strip().lower()
+    admin = await db.admins.find_one({"email": email})
     if not admin or not verify_password(data.password, admin["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(admin["email"])
@@ -552,6 +601,103 @@ async def admin_login(data: AdminLogin):
 @api_router.get("/admin/me")
 async def admin_me(current_admin=Depends(get_admin_user)):
     return {"email": current_admin["email"], "role": "admin"}
+
+
+@api_router.get("/admin/check-access")
+async def admin_check_access(user=Depends(get_required_user)):
+    """Returns whether the currently-signed-in Google user is an authorized admin."""
+    email = (user.get("email") or "").lower()
+    allowed = email in ALLOWED_ADMIN_EMAILS
+    return {"is_admin": allowed, "email": email}
+
+
+async def _send_email_async(to_email: str, subject: str, html: str):
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY missing — cannot send email")
+        return None
+    try:
+        return await asyncio.to_thread(resend.Emails.send, {
+            "from": SENDER_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+        })
+    except Exception as e:
+        logger.error(f"Resend send failed: {e}")
+        return None
+
+
+@api_router.post("/admin/forgot-password")
+async def admin_forgot_password(data: AdminForgotPassword):
+    """Send a 6-digit reset code to the admin's email. Always returns success to prevent enumeration."""
+    email = data.email.strip().lower()
+    admin = await db.admins.find_one({"email": email})
+    if admin:
+        code = "".join(secrets.choice("0123456789") for _ in range(6))
+        await db.admin_reset_codes.update_one(
+            {"email": email},
+            {"$set": {
+                "email": email,
+                "code_hash": hash_password(code),
+                "expires_at": datetime.now(timezone.utc) + timedelta(minutes=15),
+                "attempts": 0,
+                "created_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #F0F9FF; border-radius: 16px;">
+          <div style="text-align: center; background: linear-gradient(135deg, #0EA5E9, #06B6D4); padding: 24px; border-radius: 12px; color: white;">
+            <h1 style="margin: 0; font-size: 22px;">CoolBreeze PK — Admin Reset</h1>
+            <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">Password reset code</p>
+          </div>
+          <div style="background: white; margin-top: 16px; padding: 24px; border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <p style="color: #475569; margin: 0 0 12px;">Your verification code is:</p>
+            <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #0EA5E9; background: #F0F9FF; padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+              {code}
+            </div>
+            <p style="color: #94A3B8; font-size: 12px; margin: 0;">Code expires in 15 minutes. Don't share it.</p>
+          </div>
+          <p style="text-align: center; margin-top: 16px; color: #94A3B8; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
+        </div>
+        """
+        result = await _send_email_async(email, "CoolBreeze Admin Password Reset Code", html)
+        # When using onboarding@resend.dev, Resend only delivers to the account owner's verified email.
+        # Return success regardless to prevent enumeration; log result for debugging.
+        logger.info(f"Reset code sent to {email}: send_result={result}")
+    return {"message": "If this email is registered, a reset code has been sent."}
+
+
+@api_router.post("/admin/reset-password")
+async def admin_reset_password(data: AdminResetPassword):
+    email = data.email.strip().lower()
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    record = await db.admin_reset_codes.find_one({"email": email})
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    expires_at = record.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        await db.admin_reset_codes.delete_one({"email": email})
+        raise HTTPException(status_code=400, detail="Code has expired. Request a new one.")
+    if record.get("attempts", 0) >= 5:
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code.")
+    if not verify_password(data.code, record["code_hash"]):
+        await db.admin_reset_codes.update_one({"email": email}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="Invalid code")
+    # Update password
+    result = await db.admins.update_one(
+        {"email": email},
+        {"$set": {"password_hash": hash_password(data.new_password), "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    await db.admin_reset_codes.delete_one({"email": email})
+    return {"message": "Password updated. You can now log in with your new password."}
 
 
 # ---- Products ----
@@ -811,6 +957,18 @@ async def update_site_settings(data: SiteSettingsUpdate, current_admin=Depends(g
     await db.site_settings.update_one({"key": "main"}, {"$set": safe}, upsert=True)
     doc = await db.site_settings.find_one({"key": "main"}, {"_id": 0, "key": 0})
     return doc
+
+
+@api_router.put("/admin/testimonials")
+async def update_testimonials(data: TestimonialsBulkUpdate, current_admin=Depends(get_admin_user)):
+    """Replace the entire testimonials list (simple bulk-edit model)."""
+    items = [t.model_dump() for t in data.testimonials]
+    await db.site_settings.update_one(
+        {"key": "main"},
+        {"$set": {"featured_testimonials": items}},
+        upsert=True,
+    )
+    return {"featured_testimonials": items}
 
 
 # ---- Admin Stats ----

@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import { Wind, Menu, X, ShieldCheck, ShoppingBag, User, LogIn, LogOut, Package, ChevronDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "./ui/dropdown-menu";
 
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
   const { user, login, logout } = useAuth();
   const { totalQty, setOpen: openCart } = useCart();
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    axios.get(`${API}/admin/check-access`, { withCredentials: true })
+      .then((r) => setIsAdmin(!!r.data?.is_admin))
+      .catch(() => setIsAdmin(false));
+  }, [user]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-sky-100 shadow-sm" data-testid="site-header">
@@ -106,10 +117,10 @@ export default function Header() {
 
             <Link
               to="/admin"
-              className="hidden lg:flex items-center gap-1.5 bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-3 py-2 rounded-full font-semibold text-xs transition-all border border-transparent hover:border-sky-200"
+              className={`${isAdmin ? "hidden lg:flex" : "hidden"} items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-full font-semibold text-xs transition-all border border-amber-400/50`}
               data-testid="admin-panel-btn"
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
               Admin
             </Link>
 
@@ -149,8 +160,8 @@ export default function Header() {
                 Sign in with Google
               </button>
             )}
-            <Link to="/admin" className="block px-4 py-2 text-slate-500 text-sm font-medium" onClick={() => setMenuOpen(false)}>
-              Admin Panel
+            <Link to="/admin" className={`block px-4 py-2 text-slate-500 text-sm font-medium ${isAdmin ? "" : "hidden"}`} onClick={() => setMenuOpen(false)} data-testid="mobile-admin-link">
+              🛡️ Admin Panel
             </Link>
           </div>
         )}

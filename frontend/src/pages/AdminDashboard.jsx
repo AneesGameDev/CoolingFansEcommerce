@@ -311,6 +311,36 @@ export default function AdminDashboard() {
     finally { setSavingSettings(false); }
   };
 
+  // ---- Testimonials editor ----
+  const [testimonials, setTestimonials] = useState([]);
+  const [savingTestimonials, setSavingTestimonials] = useState(false);
+  const [testimonialsSavedAt, setTestimonialsSavedAt] = useState(null);
+
+  useEffect(() => {
+    setTestimonials(siteSettings.featured_testimonials || []);
+  }, [siteSettings.featured_testimonials]);
+
+  const addTestimonial = () => {
+    setTestimonials((p) => [...p, { name: "", city: "", rating: 5, quote: "", avatar: "", date: "" }]);
+  };
+  const updateTestimonial = (i, field, val) => {
+    setTestimonials((p) => p.map((t, idx) => idx === i ? { ...t, [field]: field === "rating" ? Number(val) : val } : t));
+  };
+  const removeTestimonial = (i) => {
+    setTestimonials((p) => p.filter((_, idx) => idx !== i));
+  };
+  const saveTestimonials = async () => {
+    setSavingTestimonials(true);
+    try {
+      const valid = testimonials.filter((t) => t.name?.trim() && t.quote?.trim());
+      await axios.put(`${API}/admin/testimonials`, { testimonials: valid }, getConfig());
+      siteSettings.refresh?.();
+      setTestimonialsSavedAt(new Date());
+      setTimeout(() => setTestimonialsSavedAt(null), 4000);
+    } catch (e) { alert("Failed to save testimonials: " + (e.response?.data?.detail || e.message)); }
+    finally { setSavingTestimonials(false); }
+  };
+
   const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
   const adminName = localStorage.getItem("adminName") || "Admin";
 
@@ -767,6 +797,97 @@ export default function AdminDashboard() {
                 {savingSettings ? "Saving..." : "Save All Changes"}
               </button>
             </div>
+
+            {/* Testimonials Editor */}
+            <div className="mt-8 bg-slate-800 rounded-2xl border border-slate-700 p-5" data-testid="testimonials-editor">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-white font-black text-base flex items-center gap-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Customer Testimonials (auto-sliding carousel)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">Add as many real customer testimonials as you want — they auto-loop on the homepage.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addTestimonial}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all"
+                    data-testid="add-testimonial-btn"
+                  >
+                    <Plus className="w-4 h-4" /> Add Testimonial
+                  </button>
+                  <button
+                    onClick={saveTestimonials}
+                    disabled={savingTestimonials}
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-60"
+                    data-testid="save-testimonials-btn"
+                  >
+                    <Check className="w-4 h-4" /> {savingTestimonials ? "Saving..." : "Save Testimonials"}
+                  </button>
+                </div>
+              </div>
+              {testimonialsSavedAt && (
+                <div className="bg-green-500/20 border border-green-500/40 text-green-300 rounded-xl px-4 py-2.5 mb-4 text-sm flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" /> Saved — carousel updated on the homepage!
+                </div>
+              )}
+
+              {testimonials.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">No testimonials yet. Click "Add Testimonial" to add one.</div>
+              ) : (
+                <div className="space-y-3">
+                  {testimonials.map((t, i) => (
+                    <div key={i} className="bg-slate-900 rounded-2xl p-4 border border-slate-700" data-testid={`testimonial-row-${i}`}>
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                        <div className="md:col-span-3">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Name *</label>
+                          <input value={t.name} onChange={(e) => updateTestimonial(i, "name", e.target.value)}
+                            placeholder="Ayesha K."
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm" />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">City</label>
+                          <input value={t.city} onChange={(e) => updateTestimonial(i, "city", e.target.value)}
+                            placeholder="Karachi"
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm" />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Date</label>
+                          <input type="date" value={t.date || ""} onChange={(e) => updateTestimonial(i, "date", e.target.value)}
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm" />
+                        </div>
+                        <div className="md:col-span-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Stars</label>
+                          <select value={t.rating || 5} onChange={(e) => updateTestimonial(i, "rating", e.target.value)}
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-sm">
+                            {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}★</option>)}
+                          </select>
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Avatar URL</label>
+                          <input value={t.avatar || ""} onChange={(e) => updateTestimonial(i, "avatar", e.target.value)}
+                            placeholder="https://..."
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-xs font-mono" />
+                        </div>
+                        <div className="md:col-span-1 flex md:items-end md:h-full">
+                          <button onClick={() => removeTestimonial(i)}
+                            className="w-full md:w-auto bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white rounded-lg p-2 flex items-center justify-center"
+                            data-testid={`remove-testimonial-${i}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="md:col-span-12">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Quote *</label>
+                          <textarea value={t.quote} onChange={(e) => updateTestimonial(i, "quote", e.target.value)}
+                            placeholder="What did the customer say?"
+                            rows={2}
+                            className="w-full mt-0.5 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm resize-none" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -982,6 +1103,17 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <p className="text-xs text-slate-400">Upload up to 3 images (max 1.5MB each). Stored as base64.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-1">Review Date & Time (optional override)</label>
+                <input
+                  type="datetime-local"
+                  value={reviewForm.created_at || ""}
+                  onChange={(e) => setReviewForm((p) => ({ ...p, created_at: e.target.value }))}
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  data-testid="admin-review-date"
+                />
+                <p className="text-xs text-slate-400 mt-1">Leave empty to use current time. Set a past date to backdate fake/seeded reviews.</p>
               </div>
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 text-sm text-slate-300">

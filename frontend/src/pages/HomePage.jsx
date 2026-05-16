@@ -43,31 +43,31 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#F0F9FF]">
       <Header />
 
-      {/* Hero Section with cooling animations */}
-      <section className="relative overflow-hidden py-16 sm:py-24 bg-gradient-to-br from-sky-500 via-sky-600 to-cyan-700" data-testid="hero-section">
+      {/* Hero Section with cooling animations — compact on mobile so products are visible quickly */}
+      <section className="relative overflow-hidden py-8 sm:py-16 lg:py-24 bg-gradient-to-br from-sky-500 via-sky-600 to-cyan-700" data-testid="hero-section">
         <CoolingFX density={18} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 frost-glass text-white px-5 py-2 rounded-full text-sm font-bold mb-6 shadow-lg" data-testid="hero-badge">
+            <div className="inline-flex items-center gap-2 frost-glass text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold mb-3 sm:mb-6 shadow-lg" data-testid="hero-badge">
               <BadgeCheck className="w-4 h-4 fill-current text-amber-300" />
               {settings.hero_badge}
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white mb-6 leading-tight tracking-tight" data-testid="hero-title">
+            <h1 className="text-2xl sm:text-5xl lg:text-7xl font-black text-white mb-3 sm:mb-6 leading-tight tracking-tight" data-testid="hero-title">
               {settings.hero_title_main}
               <br />
               <span className="shimmer-text inline-block">{settings.hero_title_accent}</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-sky-100 mb-9 leading-relaxed max-w-2xl mx-auto" data-testid="hero-subtitle">
+            <p className="text-sm sm:text-xl text-sky-100 mb-5 sm:mb-9 leading-relaxed max-w-2xl mx-auto hidden xs:block sm:block" data-testid="hero-subtitle">
               {settings.hero_subtitle}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
               <a
                 href="#products"
-                className="group bg-white text-sky-600 font-bold px-8 py-4 rounded-full hover:bg-sky-50 transition-all active:scale-95 shadow-2xl inline-flex items-center justify-center gap-2 text-base"
+                className="group bg-white text-sky-600 font-bold px-5 sm:px-8 py-2.5 sm:py-4 rounded-full hover:bg-sky-50 transition-all active:scale-95 shadow-2xl inline-flex items-center justify-center gap-2 text-sm sm:text-base"
                 data-testid="shop-now-btn"
               >
                 <Sparkles className="w-4 h-4 text-amber-500" />
@@ -78,27 +78,33 @@ export default function HomePage() {
                 href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20a%20fan.`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-4 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2 shadow-xl"
+                className="bg-green-500 hover:bg-green-600 text-white font-bold px-5 sm:px-8 py-2.5 sm:py-4 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2 shadow-xl text-sm sm:text-base"
                 data-testid="whatsapp-hero-btn"
               >
-                <MessageCircle className="w-5 h-5" />
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 {settings.hero_cta_secondary}
               </a>
             </div>
 
-            {/* Trust Badges */}
-            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-10 text-white/90 text-sm font-medium" data-testid="hero-trust-badges">
+            {/* Trust Badges — hidden on small mobile to save space */}
+            <div className="hidden sm:flex flex-wrap justify-center gap-x-5 gap-y-2 mt-10 text-white/90 text-sm font-medium" data-testid="hero-trust-badges">
               <div className="flex items-center gap-1.5"><Truck className="w-4 h-4 text-amber-300" /> Cash on Delivery</div>
               <div className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-amber-300" /> 7-Day Check Warranty</div>
               <div className="flex items-center gap-1.5"><RotateCcw className="w-4 h-4 text-amber-300" /> Return Back Policy</div>
               <div className="flex items-center gap-1.5"><Package className="w-4 h-4 text-amber-300" /> 1-2 Day Delivery</div>
             </div>
+            {/* Mobile-only mini trust ribbon */}
+            <div className="flex sm:hidden flex-wrap justify-center gap-x-3 gap-y-1 mt-4 text-white/90 text-[10px] font-bold">
+              <span className="flex items-center gap-1"><Truck className="w-3 h-3 text-amber-300" /> COD</span>
+              <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-amber-300" /> Warranty</span>
+              <span className="flex items-center gap-1"><Package className="w-3 h-3 text-amber-300" /> 1-2 Day Ship</span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Strip */}
-      <section className="bg-slate-900 text-white py-8 border-y-4 border-amber-400" data-testid="stats-strip">
+      {/* Stats Strip — hidden on tiny mobile so products come up faster */}
+      <section className="hidden sm:block bg-slate-900 text-white py-8 border-y-4 border-amber-400" data-testid="stats-strip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {stats.map((s, i) => (
@@ -109,6 +115,18 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Mobile-only compact stats row */}
+      <section className="sm:hidden bg-slate-900 text-white py-3 border-y-2 border-amber-400">
+        <div className="grid grid-cols-4 gap-1 text-center px-2">
+          {stats.map((s, i) => (
+            <div key={i} className="flex flex-col items-center">
+              <p className="text-sm font-black text-white">{s.value}</p>
+              <p className="text-[8px] text-slate-400 uppercase tracking-wide leading-tight">{s.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -237,9 +255,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Testimonials — auto-sliding left-loop carousel */}
       {testimonials.length > 0 && (
-        <section className="bg-[#F0F9FF] py-16" data-testid="testimonials-section">
+        <section className="bg-[#F0F9FF] py-16 overflow-hidden" data-testid="testimonials-section">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-10">
               <div className="inline-block bg-rose-100 text-rose-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
@@ -250,19 +268,31 @@ export default function HomePage() {
               </h2>
               <p className="text-slate-500 mt-3">Verified buyers across Pakistan share their CoolBreeze experience.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {testimonials.map((t, i) => (
+          </div>
+          {/* Continuous left-sliding carousel — duplicates list for seamless loop, pauses on hover */}
+          <div className="relative group" data-testid="testimonials-carousel">
+            <div
+              className="flex gap-5 w-max animate-slide-left group-hover:[animation-play-state:paused]"
+              style={{ animationDuration: `${Math.max(20, testimonials.length * 7)}s` }}
+            >
+              {[...testimonials, ...testimonials].map((t, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl p-6 border border-sky-100 hover:shadow-xl hover:-translate-y-1 transition-all relative"
-                  data-testid={`testimonial-${i}`}
+                  className="bg-white rounded-2xl p-6 border border-sky-100 hover:shadow-xl transition-all relative w-[300px] sm:w-[360px] flex-shrink-0"
+                  data-testid={`testimonial-${i % testimonials.length}`}
                 >
                   <Quote className="absolute top-4 right-4 w-8 h-8 text-sky-100" />
                   <div className="flex items-center gap-3 mb-4">
-                    <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-sky-100" />
+                    {t.avatar ? (
+                      <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-sky-100" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center text-white font-bold">
+                        {(t.name || "?").charAt(0)}
+                      </div>
+                    )}
                     <div>
                       <p className="font-black text-slate-900">{t.name}</p>
-                      <p className="text-xs text-slate-500">{t.city}</p>
+                      <p className="text-xs text-slate-500">{t.city}{t.date ? ` • ${t.date}` : ""}</p>
                     </div>
                   </div>
                   <div className="flex gap-0.5 mb-2">
@@ -272,6 +302,9 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+            {/* Edge fades */}
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[#F0F9FF] to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[#F0F9FF] to-transparent" />
           </div>
         </section>
       )}

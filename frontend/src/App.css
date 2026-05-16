@@ -79,6 +79,12 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: translateX(-50%); }
 }
 
+@keyframes slide-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-slide-left { animation: slide-left linear infinite; }
+
 .animate-flake { animation: flake-fall linear infinite; }
 .animate-wind { animation: wind-flow linear infinite; }
 .animate-float { animation: float-soft ease-in-out infinite; }
