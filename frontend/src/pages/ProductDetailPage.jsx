@@ -69,6 +69,7 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (soldOut) { toast.error("This product is currently sold out"); return; }
     const variant = (product.color_variants || []).find((v) => v.name === selectedColor);
     const image = variant?.image_url || product.images?.[selectedImage] || product.images?.[0];
     addItem(product, { color: selectedColor || null, size: selectedSize || null, quantity, image });
@@ -77,6 +78,7 @@ export default function ProductDetailPage() {
 
   const handleOrderNow = () => {
     if (!product) return;
+    if (soldOut) { toast.error("This product is currently sold out"); return; }
     const variant = (product.color_variants || []).find((v) => v.name === selectedColor);
     const image = variant?.image_url || product.images?.[selectedImage] || product.images?.[0];
     addItem(product, { color: selectedColor || null, size: selectedSize || null, quantity, image });
@@ -157,6 +159,7 @@ export default function ProductDetailPage() {
 
   if (!product) return null;
 
+  const soldOut = (product.stock ?? 1) <= 0;
   const colorVariants = product.color_variants || [];
   const colorList = colorVariants.length > 0 ? colorVariants.map((v) => v.name) : (product.colors || []);
 
@@ -327,23 +330,42 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="flex gap-3 mb-3">
-              <button
-                onClick={handleAddToCart}
-                className="flex-1 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-4 rounded-2xl text-base transition-all active:scale-95 flex items-center justify-center gap-2 shadow"
-                data-testid="add-to-cart-btn"
-              >
-                <ShoppingCart className="w-5 h-5" />
-                Add to Cart
-              </button>
-              <button
-                onClick={handleOrderNow}
-                className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 rounded-2xl text-base transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
-                data-testid="order-now-btn"
-              >
-                <ShoppingBag className="w-5 h-5" />
-                Order Now
-              </button>
+              {soldOut ? (
+                <button
+                  disabled
+                  className="flex-1 bg-slate-200 text-slate-500 font-bold py-4 rounded-2xl text-base cursor-not-allowed flex items-center justify-center gap-2"
+                  data-testid="pdp-sold-out-btn"
+                >
+                  Currently Sold Out
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleAddToCart}
+                    className="flex-1 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-4 rounded-2xl text-base transition-all active:scale-95 flex items-center justify-center gap-2 shadow"
+                    data-testid="add-to-cart-btn"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={handleOrderNow}
+                    className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 rounded-2xl text-base transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                    data-testid="order-now-btn"
+                  >
+                    <ShoppingBag className="w-5 h-5" />
+                    Order Now
+                  </button>
+                </>
+              )}
             </div>
+
+            {soldOut && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3 text-center" data-testid="pdp-sold-out-notice">
+                <p className="font-bold text-red-700 text-sm">😔 Out of Stock — More coming soon!</p>
+                <p className="text-xs text-red-600 mt-0.5">Contact us on WhatsApp to get notified when this fan is back.</p>
+              </div>
+            )}
 
             {/* Trust strip */}
             <div className="grid grid-cols-3 gap-2 mb-4">

@@ -4,9 +4,10 @@ import axios from "axios";
 import {
   LayoutDashboard, Package, ShoppingCart, Star, LogOut, Wind,
   Plus, Edit2, Trash2, Check, X, ChevronDown, Eye, EyeOff, TrendingUp,
-  Users, DollarSign, RefreshCw, AlertCircle, CheckCircle, Truck, XCircle
+  Users, DollarSign, RefreshCw, AlertCircle, CheckCircle, Truck, XCircle, Settings, MessageSquare
 } from "lucide-react";
 import StarRating from "../components/StarRating";
+import { useSiteSettings } from "../contexts/SiteSettingsContext";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -31,13 +32,29 @@ const EMPTY_PRODUCT = {
 };
 
 const EMPTY_REVIEW = {
-  product_id: "", reviewer_name: "", rating: 5, comment: "", images: [], verified_purchase: false, is_approved: true
+  product_id: "", reviewer_name: "", rating: 5, comment: "", images: [], verified_purchase: false, is_approved: true, created_at: ""
 };
 
 const MAX_REVIEW_IMG_BYTES = 1.5 * 1024 * 1024;
 
+const SITE_SETTINGS_GROUPS = [
+  { title: "Brand", keys: ["brand_name", "brand_tagline", "whatsapp_number"] },
+  { title: "Hero Section", keys: ["hero_badge", "hero_title_main", "hero_title_accent", "hero_subtitle", "hero_cta_primary", "hero_cta_secondary"] },
+  { title: "Summer Sale Banner", keys: ["sale_banner_primary", "sale_banner_secondary", "sale_banner_tertiary"] },
+  { title: "Products Section", keys: ["products_section_title", "products_section_subtitle"] },
+  { title: "Why Buy Section", keys: ["why_buy_title", "why_buy_subtitle"] },
+  { title: "Stats Strip", keys: ["stats_customers_value", "stats_customers_label", "stats_orders_value", "stats_orders_label", "stats_rating_value", "stats_rating_label", "stats_cities_value", "stats_cities_label"] },
+  { title: "Founder Note", keys: ["founder_quote", "founder_name", "founder_role"] },
+  { title: "Guarantee Banner", keys: ["guarantee_title", "guarantee_text"] },
+  { title: "WhatsApp CTA", keys: ["whatsapp_cta_title", "whatsapp_cta_subtitle"] },
+  { title: "Footer", keys: ["footer_tagline"] },
+];
+
+const TEXTAREA_KEYS = new Set(["hero_subtitle", "why_buy_subtitle", "products_section_subtitle", "founder_quote", "guarantee_text", "whatsapp_cta_subtitle", "footer_tagline"]);
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const siteSettings = useSiteSettings();
   const [tab, setTab] = useState("dashboard");
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -58,6 +75,11 @@ export default function AdminDashboard() {
   const [editingReview, setEditingReview] = useState(null);
   const [reviewForm, setReviewForm] = useState(EMPTY_REVIEW);
   const [savingReview, setSavingReview] = useState(false);
+
+  // Site settings state
+  const [settingsForm, setSettingsForm] = useState({});
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSavedAt, setSettingsSavedAt] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("adminToken");
@@ -193,7 +215,18 @@ export default function AdminDashboard() {
   const openReviewForm = (review = null) => {
     if (review) {
       setEditingReview(review);
-      setReviewForm({ ...review, images: review.images || [] });
+      // Convert ISO created_at to datetime-local format
+      let createdLocal = "";
+      if (review.created_at) {
+        try {
+          const d = new Date(review.created_at);
+          if (!isNaN(d)) {
+            const pad = (n) => String(n).padStart(2, "0");
+            createdLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          }
+        } catch {}
+      }
+      setReviewForm({ ...review, images: review.images || [], created_at: createdLocal });
     } else {
       setEditingReview(null);
       setReviewForm(EMPTY_REVIEW);
@@ -223,7 +256,14 @@ export default function AdminDashboard() {
     e.preventDefault();
     setSavingReview(true);
     try {
-      const payload = { ...reviewForm, images: reviewForm.images || [] };
+      // Convert datetime-local to ISO if provided
+      let createdIso = reviewForm.created_at;
+      if (createdIso && !createdIso.endsWith("Z") && !createdIso.includes("+")) {
+        // datetime-local format e.g. "2024-05-12T14:30"
+        const d = new Date(createdIso);
+        if (!isNaN(d)) createdIso = d.toISOString();
+      }
+      const payload = { ...reviewForm, images: reviewForm.images || [], created_at: createdIso || null };
       if (editingReview) {
         const res = await axios.put(`${API}/admin/reviews/${editingReview.id}`, payload, getConfig());
         setReviews(prev => prev.map(r => r.id === editingReview.id ? res.data : r));
@@ -251,6 +291,26 @@ export default function AdminDashboard() {
     } catch { alert("Failed to toggle review"); }
   };
 
+  // ---- Site Settings ----
+  useEffect(() => {
+    // Populate settings form whenever siteSettings refreshes
+    const allowedKeys = SITE_SETTINGS_GROUPS.flatMap(g => g.keys);
+    const next = {};
+    for (const k of allowedKeys) next[k] = siteSettings[k] ?? "";
+    setSettingsForm(next);
+  }, [siteSettings]);
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await axios.put(`${API}/admin/site-settings`, { settings: settingsForm }, getConfig());
+      siteSettings.refresh?.();
+      setSettingsSavedAt(new Date());
+      setTimeout(() => setSettingsSavedAt(null), 4000);
+    } catch (e) { alert("Failed to save settings: " + (e.response?.data?.detail || e.message)); }
+    finally { setSavingSettings(false); }
+  };
+
   const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
   const adminName = localStorage.getItem("adminName") || "Admin";
 
@@ -259,6 +319,7 @@ export default function AdminDashboard() {
     { key: "orders", label: `Orders (${orders.length})`, icon: ShoppingCart },
     { key: "products", label: `Products (${products.length})`, icon: Package },
     { key: "reviews", label: `Reviews (${reviews.length})`, icon: Star },
+    { key: "site", label: "Site Content", icon: Settings },
   ];
 
   return (
@@ -532,7 +593,9 @@ export default function AdminDashboard() {
                     <div className="p-4">
                       <p className="text-white font-bold text-sm line-clamp-1 mb-1">{p.name}</p>
                       <p className="text-sky-400 font-black text-sm">Rs. {p.discounted_price.toLocaleString()} <span className="text-slate-500 line-through font-normal">Rs. {p.price.toLocaleString()}</span></p>
-                      <p className="text-slate-400 text-xs mt-1">Stock: {p.stock} | Sold: {p.total_sold || 0}</p>
+                      <p className="text-slate-400 text-xs mt-1">
+                        Stock: <span className={p.stock <= 0 ? "text-red-400 font-bold" : "text-white"}>{p.stock <= 0 ? "SOLD OUT" : p.stock}</span> | Sold: {p.total_sold || 0}
+                      </p>
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => openProductForm(p)}
@@ -631,6 +694,78 @@ export default function AdminDashboard() {
                   <p>No reviews yet</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ---- SITE CONTENT ---- */}
+        {tab === "site" && (
+          <div data-testid="site-content-tab">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div>
+                <h2 className="text-xl font-black text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>Site Content</h2>
+                <p className="text-slate-400 text-sm mt-1">Edit every major text, deal banner, and brand copy on your store.</p>
+              </div>
+              <button
+                onClick={saveSettings}
+                disabled={savingSettings}
+                className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60"
+                data-testid="save-site-settings-btn"
+              >
+                <Check className="w-4 h-4" />
+                {savingSettings ? "Saving..." : "Save All Changes"}
+              </button>
+            </div>
+            {settingsSavedAt && (
+              <div className="bg-green-500/20 border border-green-500/40 text-green-300 rounded-xl px-4 py-2.5 mb-5 text-sm flex items-center gap-2" data-testid="settings-saved-toast">
+                <CheckCircle className="w-4 h-4" /> Saved — changes are live on the website!
+              </div>
+            )}
+
+            <div className="space-y-5">
+              {SITE_SETTINGS_GROUPS.map((group) => (
+                <div key={group.title} className="bg-slate-800 rounded-2xl border border-slate-700 p-5" data-testid={`settings-group-${group.title.replace(/\s+/g, '-').toLowerCase()}`}>
+                  <h3 className="text-white font-black mb-4 text-sm uppercase tracking-wider flex items-center gap-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    <MessageSquare className="w-4 h-4 text-sky-400" /> {group.title}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {group.keys.map((key) => (
+                      <div key={key} className={TEXTAREA_KEYS.has(key) ? "md:col-span-2" : ""}>
+                        <label className="block text-xs font-bold text-slate-300 mb-1 uppercase tracking-wider">{key.replace(/_/g, " ")}</label>
+                        {TEXTAREA_KEYS.has(key) ? (
+                          <textarea
+                            value={settingsForm[key] ?? ""}
+                            onChange={(e) => setSettingsForm((p) => ({ ...p, [key]: e.target.value }))}
+                            rows={3}
+                            className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                            data-testid={`settings-input-${key}`}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={settingsForm[key] ?? ""}
+                            onChange={(e) => setSettingsForm((p) => ({ ...p, [key]: e.target.value }))}
+                            className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid={`settings-input-${key}`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={saveSettings}
+                disabled={savingSettings}
+                className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-60"
+                data-testid="save-site-settings-btn-bottom"
+              >
+                <Check className="w-4 h-4" />
+                {savingSettings ? "Saving..." : "Save All Changes"}
+              </button>
             </div>
           </div>
         )}

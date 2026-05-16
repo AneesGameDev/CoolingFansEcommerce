@@ -13,6 +13,7 @@ import WhatsAppButton from "./components/WhatsAppButton";
 import CartDrawer from "./components/CartDrawer";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
+import { SiteSettingsProvider } from "./contexts/SiteSettingsContext";
 import { Toaster } from "./components/ui/sonner";
 
 function AppRouter() {
@@ -39,14 +40,16 @@ function AppRouter() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <CartDrawer />
-          <WhatsAppButton />
-          <Toaster position="top-center" richColors />
-          <AppRouter />
-        </CartProvider>
-      </AuthProvider>
+      <SiteSettingsProvider>
+        <AuthProvider>
+          <CartProvider>
+            <CartDrawer />
+            <WhatsAppButton />
+            <Toaster position="top-center" richColors />
+            <AppRouter />
+          </CartProvider>
+        </AuthProvider>
+      </SiteSettingsProvider>
     </BrowserRouter>
   );
 }

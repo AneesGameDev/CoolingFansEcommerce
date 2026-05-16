@@ -184,10 +184,68 @@ class AdminReviewCreate(BaseModel):
     images: List[str] = []
     verified_purchase: bool = False
     is_approved: bool = True
+    created_at: Optional[str] = None  # Admin can override review date/time (ISO format)
 
 
 class SessionExchange(BaseModel):
     session_id: str
+
+
+class LinkGuestOrders(BaseModel):
+    order_numbers: List[str]
+
+
+class SiteSettingsUpdate(BaseModel):
+    settings: dict
+
+
+# ---- Default Site Settings ----
+
+DEFAULT_SITE_SETTINGS = {
+    "brand_name": "CoolBreeze PK",
+    "brand_tagline": "Beat the Heat with Premium Quality",
+    "whatsapp_number": "923000000000",
+    "hero_badge": "Pakistan's #1 Imported Fan Store",
+    "hero_title_main": "Beat the Heat with",
+    "hero_title_accent": "Premium Quality",
+    "hero_subtitle": "Directly imported neck fans, baby fans & travel fans — long battery, 7-day warranty, Cash on Delivery!",
+    "hero_cta_primary": "Shop Summer Sale",
+    "hero_cta_secondary": "Chat on WhatsApp",
+    "sale_banner_primary": "🌡️ SUMMER SALE — UP TO 80% OFF",
+    "sale_banner_secondary": "FREE DELIVERY on orders over Rs. 2000",
+    "sale_banner_tertiary": "Limited Stock — Selling Fast!",
+    "why_buy_title": "Why Pakistan Trusts CoolBreeze",
+    "why_buy_subtitle": "We import premium fans directly — no middlemen, no copies. Real quality, real cooling, real value.",
+    "products_section_title": "Our Premium Fan Collection",
+    "products_section_subtitle": "10 imported fans — each handpicked, each on sale, each ready to ship today.",
+    "stats_customers_value": "50,000+",
+    "stats_customers_label": "Happy Customers",
+    "stats_orders_value": "12,000+",
+    "stats_orders_label": "Orders Delivered",
+    "stats_rating_value": "4.9/5",
+    "stats_rating_label": "Customer Rating",
+    "stats_cities_value": "100+",
+    "stats_cities_label": "Cities Served",
+    "founder_quote": "Every Pakistani family deserves real cooling comfort — not cheap copies. That's why we import directly from premium factories and stand behind every single fan we sell.",
+    "founder_name": "Team CoolBreeze",
+    "founder_role": "Bringing Real Cool to Real Homes",
+    "guarantee_title": "100% Satisfaction Guarantee",
+    "guarantee_text": "Open the box. Test the fan. Fall in love — or send it back, no questions asked.",
+    "whatsapp_cta_title": "Need Help Choosing?",
+    "whatsapp_cta_subtitle": "Chat with us directly on WhatsApp. Our team will help you pick the perfect fan.",
+    "footer_tagline": "Pakistan's #1 Imported Fan Store • Cash on Delivery",
+    "trust_badges": [
+        {"label": "Cash on Delivery"},
+        {"label": "7-Day Check Warranty"},
+        {"label": "Return Back Policy"},
+        {"label": "Delivery in 1-2 Days"}
+    ],
+    "featured_testimonials": [
+        {"name": "Ayesha K.", "city": "Karachi", "rating": 5, "quote": "The Neck Fan Pro is a game-changer in summer. Honestly the best Rs. 2500 I've spent this year!", "avatar": "https://i.pravatar.cc/100?img=47"},
+        {"name": "Bilal R.", "city": "Lahore", "rating": 5, "quote": "Got it for load-shedding nights — my whole family loves it. Solid build, real battery life. Genuine product.", "avatar": "https://i.pravatar.cc/100?img=12"},
+        {"name": "Hira M.", "city": "Islamabad", "rating": 5, "quote": "I was scared to order COD online. But CoolBreeze delivered in 2 days, packaging was premium, fan works perfectly.", "avatar": "https://i.pravatar.cc/100?img=32"}
+    ]
+}
 
 
 # ---- Seed Data ----
@@ -380,6 +438,17 @@ async def startup_event():
             {"total_sold": {"$exists": False}}, {"$set": {"total_sold": 0}}
         )
 
+    # Site settings seed (singleton document keyed by {"key": "main"})
+    existing_settings = await db.site_settings.find_one({"key": "main"})
+    if not existing_settings:
+        await db.site_settings.insert_one({"key": "main", **DEFAULT_SITE_SETTINGS})
+        logger.info("Seeded default site settings")
+    else:
+        # Backfill any missing default keys
+        missing = {k: v for k, v in DEFAULT_SITE_SETTINGS.items() if k not in existing_settings}
+        if missing:
+            await db.site_settings.update_one({"key": "main"}, {"$set": missing})
+
 
 # ---- Google Auth (Emergent-managed) ----
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -552,7 +621,16 @@ async def create_order(data: OrderCreate, user=Depends(get_current_user)):
     doc = data.model_dump()
     doc["status"] = "pending"
     doc["order_number"] = f"CB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
-    doc["user_email"] = user["email"] if user else (data.email or None)
+    # Auto-link to registered user: priority — logged in > matching email > matching phone
+    linked_email = None
+    if user:
+        linked_email = user["email"]
+    elif data.email:
+        existing = await db.users.find_one({"email": data.email}, {"_id": 0, "email": 1})
+        if existing:
+            linked_email = existing["email"]
+    doc["user_email"] = linked_email or (data.email or None)
+    doc["guest_phone"] = data.phone  # store for future phone-based linking
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     doc["updated_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.orders.insert_one(doc)
@@ -566,6 +644,19 @@ async def create_order(data: OrderCreate, user=Depends(get_current_user)):
                 {"$inc": {"total_sold": item.quantity}}
             )
     return doc
+
+
+@api_router.post("/orders/link-guest")
+async def link_guest_orders(data: LinkGuestOrders, user=Depends(get_required_user)):
+    """Claim previously-placed guest orders for the logged-in user by order_number."""
+    if not data.order_numbers:
+        return {"linked": 0}
+    result = await db.orders.update_many(
+        {"order_number": {"$in": data.order_numbers},
+         "$or": [{"user_email": None}, {"user_email": {"$exists": False}}, {"user_email": user["email"]}]},
+        {"$set": {"user_email": user["email"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"linked": result.modified_count}
 
 
 @api_router.get("/orders/track/{order_number}")
@@ -657,7 +748,8 @@ async def admin_create_review(data: AdminReviewCreate, current_admin=Depends(get
     doc = data.model_dump()
     if len(doc.get("images", [])) > 3:
         raise HTTPException(status_code=400, detail="Max 3 images allowed")
-    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    if not doc.get("created_at"):
+        doc["created_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.reviews.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
@@ -671,6 +763,9 @@ async def update_review(review_id: str, data: AdminReviewCreate, current_admin=D
     update_data = data.model_dump()
     if len(update_data.get("images", [])) > 3:
         raise HTTPException(status_code=400, detail="Max 3 images allowed")
+    # Allow admin to keep existing date if not provided
+    if not update_data.get("created_at"):
+        update_data.pop("created_at", None)
     result = await db.reviews.update_one({"_id": ObjectId(review_id)}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -699,6 +794,23 @@ async def toggle_review_approval(review_id: str, current_admin=Depends(get_admin
     await db.reviews.update_one({"_id": ObjectId(review_id)}, {"$set": {"is_approved": new_status}})
     review["is_approved"] = new_status
     return doc_to_dict(review)
+
+
+# ---- Site Settings ----
+
+@api_router.get("/site-settings")
+async def get_site_settings():
+    doc = await db.site_settings.find_one({"key": "main"}, {"_id": 0, "key": 0})
+    return doc or DEFAULT_SITE_SETTINGS
+
+
+@api_router.put("/admin/site-settings")
+async def update_site_settings(data: SiteSettingsUpdate, current_admin=Depends(get_admin_user)):
+    # Whitelist keys to the known DEFAULT_SITE_SETTINGS keys
+    safe = {k: v for k, v in data.settings.items() if k in DEFAULT_SITE_SETTINGS}
+    await db.site_settings.update_one({"key": "main"}, {"$set": safe}, upsert=True)
+    doc = await db.site_settings.find_one({"key": "main"}, {"_id": 0, "key": 0})
+    return doc
 
 
 # ---- Admin Stats ----

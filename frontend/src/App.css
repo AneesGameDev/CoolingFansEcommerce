@@ -45,6 +45,75 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: scale(1.4); opacity: 0; }
 }
 
+@keyframes flake-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: var(--flake-opacity, 0.6); }
+  90% { opacity: var(--flake-opacity, 0.6); }
+  100% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes wind-flow {
+  0% { transform: translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(120vw); opacity: 0; }
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(8deg); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(-50%, 0) scale(1.1); opacity: 0.8; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-flake { animation: flake-fall linear infinite; }
+.animate-wind { animation: wind-flow linear infinite; }
+.animate-float { animation: float-soft ease-in-out infinite; }
+.animate-pulse-slow { animation: pulse-slow 6s ease-in-out infinite; }
+.animate-ticker { animation: ticker 30s linear infinite; }
+
+.shimmer-text {
+  background: linear-gradient(90deg, #FDE68A 0%, #FBBF24 25%, #FFFFFF 50%, #FBBF24 75%, #FDE68A 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+.frost-glass {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.elite-border {
+  position: relative;
+}
+.elite-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #38BDF8, #0EA5E9, #FBBF24);
+  z-index: -1;
+}
+
+
 .animate-fade-in-up {
   animation: fadeInUp 0.5s ease-out forwards;
 }

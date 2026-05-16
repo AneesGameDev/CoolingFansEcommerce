@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ShoppingBag, Plus } from "lucide-react";
+import { ShoppingBag, Plus, Flame } from "lucide-react";
 import StarRating from "./StarRating";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
@@ -9,9 +9,14 @@ export default function ProductCard({ product, index = 0 }) {
   const { addItem } = useCart();
   const discountPct = Math.round(((product.price - product.discounted_price) / product.price) * 100);
   const mainImage = product.images?.[0] || "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=400";
+  const soldOut = (product.stock ?? 1) <= 0;
 
   const handleQuickAdd = (e) => {
     e.stopPropagation();
+    if (soldOut) {
+      toast.error("Out of stock");
+      return;
+    }
     addItem(product, { quantity: 1 });
     toast.success(`${product.name} added to cart`);
   };
@@ -23,25 +28,33 @@ export default function ProductCard({ product, index = 0 }) {
       onClick={() => navigate(`/product/${product.id}`)}
       data-testid={`product-card-${product.id}`}
     >
-      {/* Image */}
       <div className="relative aspect-square bg-slate-50 overflow-hidden">
         <img
           src={mainImage}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-105 ${soldOut ? "grayscale opacity-80" : ""}`}
           loading="lazy"
           onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=400"; }}
         />
-        {discountPct > 0 && (
+        {discountPct > 0 && !soldOut && (
           <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-sm" data-testid={`discount-badge-${product.id}`}>
             -{discountPct}%
           </div>
         )}
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-          Sale
-        </div>
-        {product.total_sold > 50 && (
-          <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+        {soldOut ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-red-600 text-white font-black text-sm px-4 py-1.5 rounded-full -rotate-12 shadow-lg border-2 border-white" data-testid={`sold-out-badge-${product.id}`}>
+              SOLD OUT
+            </div>
+          </div>
+        ) : (
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            Sale
+          </div>
+        )}
+        {product.total_sold > 50 && !soldOut && (
+          <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Flame className="w-3 h-3 text-amber-400" />
             {product.total_sold}+ sold
           </div>
         )}
@@ -71,24 +84,35 @@ export default function ProductCard({ product, index = 0 }) {
             <p className="text-xs text-slate-400 mb-2">Battery: {product.battery_life}</p>
           )}
 
-          <div className="flex gap-1.5">
+          {soldOut ? (
             <button
-              className="flex-1 bg-sky-500 hover:bg-sky-600 text-white rounded-xl py-2 text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-              onClick={(e) => { e.stopPropagation(); navigate(`/product/${product.id}`); }}
-              data-testid={`order-btn-${product.id}`}
+              disabled
+              className="w-full bg-slate-200 text-slate-500 rounded-xl py-2 text-sm font-semibold cursor-not-allowed"
+              data-testid={`soldout-btn-${product.id}`}
+              onClick={(e) => e.stopPropagation()}
             >
-              <ShoppingBag className="w-4 h-4" />
-              Order Now
+              Currently Sold Out
             </button>
-            <button
-              className="bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-xl px-3 py-2 text-sm font-semibold transition-all active:scale-95 flex items-center justify-center"
-              onClick={handleQuickAdd}
-              aria-label="Add to cart"
-              data-testid={`add-cart-btn-${product.id}`}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
+          ) : (
+            <div className="flex gap-1.5">
+              <button
+                className="flex-1 bg-sky-500 hover:bg-sky-600 text-white rounded-xl py-2 text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                onClick={(e) => { e.stopPropagation(); navigate(`/product/${product.id}`); }}
+                data-testid={`order-btn-${product.id}`}
+              >
+                <ShoppingBag className="w-4 h-4" />
+                Order Now
+              </button>
+              <button
+                className="bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-xl px-3 py-2 text-sm font-semibold transition-all active:scale-95 flex items-center justify-center"
+                onClick={handleQuickAdd}
+                aria-label="Add to cart"
+                data-testid={`add-cart-btn-${product.id}`}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

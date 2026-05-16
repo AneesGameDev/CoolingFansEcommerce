@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Wind, Zap, Shield, Star, ChevronRight, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle } from "lucide-react";
+import { Wind, Shield, Star, ChevronRight, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle, Sparkles, Heart, ShieldCheck, Award, Quote, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import ProductCard from "../components/ProductCard";
+import CoolingFX from "../components/CoolingFX";
+import { useSiteSettings } from "../contexts/SiteSettingsContext";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const WHY_BUY = [
-  { icon: Plane, title: "Directly Imported", desc: "Premium-grade imported fans, not local copies. Real quality, real performance.", color: "from-sky-400 to-blue-500" },
+  { icon: Plane, title: "Directly Imported", desc: "Premium-grade fans straight from top factories. No local copies, no shortcuts — only the real thing.", color: "from-sky-400 to-blue-500" },
   { icon: Truck, title: "1-2 Day Delivery", desc: "Lightning-fast nationwide delivery across Pakistan. Free shipping on orders over Rs. 2000.", color: "from-amber-400 to-orange-500" },
-  { icon: Shield, title: "7-Day Check Warranty", desc: "Open the box, test the fan, only pay if you're 100% happy.", color: "from-green-400 to-emerald-500" },
-  { icon: RotateCcw, title: "Easy Returns", desc: "Not satisfied? No questions asked. Return-back policy active for every order.", color: "from-rose-400 to-pink-500" },
-  { icon: BadgeCheck, title: "COD Only", desc: "Pay cash on delivery — no advance payment, no online fraud risk.", color: "from-violet-400 to-purple-500" },
-  { icon: Zap, title: "Long Battery", desc: "Rechargeable fans with up to 20-hour battery, perfect for load-shedding.", color: "from-yellow-400 to-amber-500" },
+  { icon: ShieldCheck, title: "7-Day Check Warranty", desc: "Open the box, test the fan, only pay if you're 100% happy with it.", color: "from-green-400 to-emerald-500" },
+  { icon: RotateCcw, title: "Easy Returns", desc: "Not satisfied? No questions asked. Return-back policy active on every order.", color: "from-rose-400 to-pink-500" },
+  { icon: BadgeCheck, title: "COD Only", desc: "Pay cash on delivery — no advance payment, no online fraud, total peace of mind.", color: "from-violet-400 to-purple-500" },
+  { icon: Award, title: "Quality Guaranteed", desc: "Every fan is tested before dispatch. We stand behind every product we ship.", color: "from-yellow-400 to-amber-500" },
 ];
 
 export default function HomePage() {
+  const settings = useSiteSettings();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,89 +30,113 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const stats = [
+    { value: settings.stats_customers_value, label: settings.stats_customers_label, icon: Heart, color: "text-rose-500" },
+    { value: settings.stats_orders_value, label: settings.stats_orders_label, icon: Package, color: "text-sky-500" },
+    { value: settings.stats_rating_value, label: settings.stats_rating_label, icon: Star, color: "text-amber-500" },
+    { value: settings.stats_cities_value, label: settings.stats_cities_label, icon: Truck, color: "text-green-500" },
+  ];
+
+  const testimonials = settings.featured_testimonials || [];
+
   return (
     <div className="min-h-screen bg-[#F0F9FF]">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden hero-gradient py-14 sm:py-20" data-testid="hero-section">
-        <div className="absolute inset-0 opacity-10">
-          {[...Array(6)].map((_, i) => (
-            <Wind
-              key={i}
-              className="absolute text-white"
-              style={{ width: `${40 + i * 20}px`, height: `${40 + i * 20}px`, top: `${10 + i * 15}%`, left: `${5 + i * 16}%`, transform: `rotate(${i * 30}deg)`, opacity: 0.5 }}
-            />
-          ))}
-        </div>
+      {/* Hero Section with cooling animations */}
+      <section className="relative overflow-hidden py-16 sm:py-24 bg-gradient-to-br from-sky-500 via-sky-600 to-cyan-700" data-testid="hero-section">
+        <CoolingFX density={18} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5 border border-white/30">
-              <BadgeCheck className="w-4 h-4 fill-current" />
-              Pakistan's #1 Imported Fan Store
+            <div className="inline-flex items-center gap-2 frost-glass text-white px-5 py-2 rounded-full text-sm font-bold mb-6 shadow-lg" data-testid="hero-badge">
+              <BadgeCheck className="w-4 h-4 fill-current text-amber-300" />
+              {settings.hero_badge}
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-5 leading-tight" data-testid="hero-title">
-              Beat the Heat with
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white mb-6 leading-tight tracking-tight" data-testid="hero-title">
+              {settings.hero_title_main}
               <br />
-              <span className="text-amber-300">Premium Quality</span>
+              <span className="shimmer-text inline-block">{settings.hero_title_accent}</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-sky-100 mb-8 leading-relaxed">
-              Directly imported neck fans, baby fans & travel fans — long battery, 7-day warranty, Cash on Delivery!
+            <p className="text-lg sm:text-xl text-sky-100 mb-9 leading-relaxed max-w-2xl mx-auto" data-testid="hero-subtitle">
+              {settings.hero_subtitle}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
                 href="#products"
-                className="bg-white text-sky-600 font-bold px-8 py-3.5 rounded-full hover:bg-sky-50 transition-all active:scale-95 shadow-lg inline-flex items-center justify-center gap-2"
+                className="group bg-white text-sky-600 font-bold px-8 py-4 rounded-full hover:bg-sky-50 transition-all active:scale-95 shadow-2xl inline-flex items-center justify-center gap-2 text-base"
                 data-testid="shop-now-btn"
               >
-                Shop Summer Sale
-                <ChevronRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                {settings.hero_cta_primary}
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="https://wa.me/923000000000?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20a%20fan."
+                href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20a%20fan.`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-green-400 hover:bg-green-500 text-white font-bold px-8 py-3.5 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+                className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-4 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2 shadow-xl"
                 data-testid="whatsapp-hero-btn"
               >
                 <MessageCircle className="w-5 h-5" />
-                Chat on WhatsApp
+                {settings.hero_cta_secondary}
               </a>
             </div>
 
             {/* Trust Badges */}
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-8 text-white/90 text-sm">
-              <div className="flex items-center gap-1.5"><Truck className="w-4 h-4" /> Cash on Delivery</div>
-              <div className="flex items-center gap-1.5"><Shield className="w-4 h-4" /> 7-Day Check Warranty</div>
-              <div className="flex items-center gap-1.5"><RotateCcw className="w-4 h-4" /> Return Back Policy</div>
-              <div className="flex items-center gap-1.5"><Package className="w-4 h-4" /> Delivery in 1-2 Days</div>
+            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-10 text-white/90 text-sm font-medium" data-testid="hero-trust-badges">
+              <div className="flex items-center gap-1.5"><Truck className="w-4 h-4 text-amber-300" /> Cash on Delivery</div>
+              <div className="flex items-center gap-1.5"><Shield className="w-4 h-4 text-amber-300" /> 7-Day Check Warranty</div>
+              <div className="flex items-center gap-1.5"><RotateCcw className="w-4 h-4 text-amber-300" /> Return Back Policy</div>
+              <div className="flex items-center gap-1.5"><Package className="w-4 h-4 text-amber-300" /> 1-2 Day Delivery</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Summer Sale Banner */}
-      <div className="bg-gradient-to-r from-red-500 to-amber-500 text-white py-3 overflow-hidden" data-testid="sale-banner">
-        <div className="flex animate-pulse items-center justify-center gap-8 flex-wrap px-4">
-          <span className="font-black text-sm sm:text-base whitespace-nowrap">🌡️ SUMMER SALE — UP TO 80% OFF</span>
-          <span className="font-bold text-sm whitespace-nowrap">FREE DELIVERY on orders over Rs. 2000</span>
-          <span className="font-black text-sm sm:text-base whitespace-nowrap">Limited Stock!</span>
+      {/* Stats Strip */}
+      <section className="bg-slate-900 text-white py-8 border-y-4 border-amber-400" data-testid="stats-strip">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {stats.map((s, i) => (
+              <div key={i} className="flex flex-col items-center gap-1" data-testid={`stat-${i}`}>
+                <s.icon className={`w-6 h-6 mb-1 ${s.color}`} />
+                <p className="text-2xl sm:text-3xl font-black text-white">{s.value}</p>
+                <p className="text-xs sm:text-sm text-slate-400 font-semibold uppercase tracking-wider">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Summer Sale Ticker */}
+      <div className="bg-gradient-to-r from-red-500 via-amber-500 to-red-500 text-white py-3 overflow-hidden relative" data-testid="sale-banner">
+        <div className="animate-ticker whitespace-nowrap flex">
+          {[...Array(2)].map((_, idx) => (
+            <div key={idx} className="flex items-center gap-12 px-6">
+              <span className="font-black text-sm sm:text-base whitespace-nowrap">{settings.sale_banner_primary}</span>
+              <span className="font-bold text-sm whitespace-nowrap">•</span>
+              <span className="font-bold text-sm whitespace-nowrap">{settings.sale_banner_secondary}</span>
+              <span className="font-bold text-sm whitespace-nowrap">•</span>
+              <span className="font-black text-sm sm:text-base whitespace-nowrap">{settings.sale_banner_tertiary}</span>
+              <span className="font-bold text-sm whitespace-nowrap">•</span>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Features Strip */}
-      <div className="bg-white border-y border-sky-100 py-4">
+      <div className="bg-white border-b border-sky-100 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             {[
               { icon: "⚡", title: "Long Battery", desc: "Up to 20 hours" },
-              { icon: "🌬️", title: "High Speed", desc: "Turbo Mode" },
-              { icon: "🔇", title: "Ultra Quiet", desc: "< 35dB noise" },
-              { icon: "🏅", title: "Import Quality", desc: "Certified products" },
+              { icon: "🌬️", title: "Turbo Speed", desc: "Real cooling power" },
+              { icon: "🔇", title: "Ultra Quiet", desc: "< 35dB whisper mode" },
+              { icon: "🏅", title: "Certified Imports", desc: "Premium tested quality" },
             ].map((f, i) => (
               <div key={i} className="flex flex-col items-center gap-1 p-2">
                 <span className="text-2xl">{f.icon}</span>
@@ -122,15 +149,16 @@ export default function HomePage() {
       </div>
 
       {/* Products Section */}
-      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="products-section">
-        <div className="text-center mb-8">
-          <div className="inline-block bg-sky-100 text-sky-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
+      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14" data-testid="products-section">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
+            <Flame className="w-3.5 h-3.5 text-amber-500" />
             Summer Collection 2024
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Our Fan Collection
+          <h2 className="text-3xl sm:text-5xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="products-title">
+            {settings.products_section_title}
           </h2>
-          <p className="text-slate-500 mt-2">10 premium imported fans — all with Summer discounts!</p>
+          <p className="text-slate-500 mt-3 max-w-xl mx-auto" data-testid="products-subtitle">{settings.products_section_subtitle}</p>
         </div>
 
         {loading ? (
@@ -156,61 +184,130 @@ export default function HomePage() {
       </section>
 
       {/* Why Buy With Us */}
-      <section className="bg-white border-y border-sky-100 py-14" data-testid="why-buy-section">
+      <section className="bg-white border-y border-sky-100 py-16" data-testid="why-buy-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
+          <div className="text-center mb-12">
             <div className="inline-block bg-amber-100 text-amber-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
-              Why CoolBreeze PK
+              The CoolBreeze Promise
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Why Buy With Us?
+            <h2 className="text-3xl sm:text-5xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="why-buy-title">
+              {settings.why_buy_title}
             </h2>
-            <p className="text-slate-500 mt-2 max-w-2xl mx-auto">We import premium fans directly — no middlemen, no compromises. Just real quality at the best Pakistani prices.</p>
+            <p className="text-slate-500 mt-3 max-w-2xl mx-auto" data-testid="why-buy-subtitle">{settings.why_buy_subtitle}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {WHY_BUY.map((b, i) => (
               <div
                 key={i}
-                className="group bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-2xl p-5 hover:shadow-lg hover:border-sky-200 transition-all"
+                className="group bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-2xl p-6 hover:shadow-xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
                 data-testid={`why-buy-${i}`}
               >
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${b.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                  <b.icon className="w-6 h-6 text-white" />
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${b.color} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-lg`}>
+                  <b.icon className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="font-black text-slate-900 mb-1.5" style={{ fontFamily: 'Outfit, sans-serif' }}>{b.title}</h3>
+                <h3 className="font-black text-slate-900 text-lg mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>{b.title}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{b.desc}</p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/track"
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
-              data-testid="cta-track"
-            >
-              <Package className="w-4 h-4" /> Track Your Order
-            </Link>
-            <a
-              href="#products"
-              className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-7 py-3 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2"
-            >
-              Browse All Fans <ChevronRight className="w-4 h-4" />
-            </a>
+      {/* Money-Back Guarantee Banner */}
+      <section className="relative py-14 overflow-hidden bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" data-testid="guarantee-section">
+        <div className="absolute inset-0 opacity-10">
+          {[...Array(8)].map((_, i) => (
+            <ShieldCheck key={i} className="absolute text-white" style={{
+              width: `${40 + i * 15}px`, height: `${40 + i * 15}px`,
+              top: `${(i * 13) % 100}%`, left: `${(i * 17) % 100}%`,
+            }} />
+          ))}
+        </div>
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center text-white">
+          <div className="w-20 h-20 rounded-full bg-white/20 frost-glass flex items-center justify-center mx-auto mb-5 shadow-2xl">
+            <ShieldCheck className="w-10 h-10 text-white" />
+          </div>
+          <h3 className="text-3xl sm:text-4xl font-black mb-3" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="guarantee-title">
+            {settings.guarantee_title}
+          </h3>
+          <p className="text-lg text-white/95 max-w-2xl mx-auto leading-relaxed" data-testid="guarantee-text">
+            {settings.guarantee_text}
+          </p>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      {testimonials.length > 0 && (
+        <section className="bg-[#F0F9FF] py-16" data-testid="testimonials-section">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10">
+              <div className="inline-block bg-rose-100 text-rose-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
+                Loved by Pakistan
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                Real Reviews from Real Homes
+              </h2>
+              <p className="text-slate-500 mt-3">Verified buyers across Pakistan share their CoolBreeze experience.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {testimonials.map((t, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl p-6 border border-sky-100 hover:shadow-xl hover:-translate-y-1 transition-all relative"
+                  data-testid={`testimonial-${i}`}
+                >
+                  <Quote className="absolute top-4 right-4 w-8 h-8 text-sky-100" />
+                  <div className="flex items-center gap-3 mb-4">
+                    <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-sky-100" />
+                    <div>
+                      <p className="font-black text-slate-900">{t.name}</p>
+                      <p className="text-xs text-slate-500">{t.city}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-0.5 mb-2">
+                    {[...Array(t.rating || 5)].map((_, j) => <Star key={j} className="w-4 h-4 text-amber-400 fill-amber-400" />)}
+                  </div>
+                  <p className="text-slate-700 text-sm leading-relaxed italic">"{t.quote}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Founder Quote Section */}
+      <section className="bg-slate-900 py-16 relative overflow-hidden" data-testid="founder-section">
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-sky-500 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-500 rounded-full blur-3xl" />
+        </div>
+        <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <Quote className="w-12 h-12 text-amber-400 mx-auto mb-5" />
+          <p className="text-xl sm:text-2xl text-white leading-relaxed font-medium mb-6" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="founder-quote">
+            "{settings.founder_quote}"
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center">
+              <Wind className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="font-black text-white" data-testid="founder-name">{settings.founder_name}</p>
+              {settings.founder_role && <p className="text-sm text-amber-300" data-testid="founder-role">{settings.founder_role}</p>}
+            </div>
           </div>
         </div>
       </section>
 
       {/* WhatsApp CTA Section */}
-      <section className="bg-green-50 border-y border-green-100 py-10">
+      <section className="bg-green-50 border-y border-green-100 py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Need Help Choosing?
+          <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="whatsapp-cta-title">
+            {settings.whatsapp_cta_title}
           </h3>
-          <p className="text-slate-600 mb-5">Chat with us directly on WhatsApp. Our team will help you pick the perfect fan.</p>
+          <p className="text-slate-600 mb-5" data-testid="whatsapp-cta-subtitle">{settings.whatsapp_cta_subtitle}</p>
           <a
-            href="https://wa.me/923000000000?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20the%20right%20fan."
+            href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20the%20right%20fan.`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3.5 rounded-full transition-all shadow-lg hover:shadow-xl active:scale-95"
@@ -219,21 +316,29 @@ export default function HomePage() {
             <MessageCircle className="w-5 h-5" />
             Chat on WhatsApp
           </a>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 justify-center text-sm">
+            <Link to="/track" className="text-slate-600 hover:text-sky-600 font-semibold underline-offset-4 hover:underline">Track Your Order →</Link>
+            <span className="text-slate-300 hidden sm:inline">|</span>
+            <a href="#products" className="text-slate-600 hover:text-sky-600 font-semibold underline-offset-4 hover:underline">Browse All Fans →</a>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-8 mt-0">
+      <footer className="bg-slate-900 text-slate-400 py-10 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center">
-                <Wind className="w-4 h-4 text-white" />
+              <div className="w-9 h-9 bg-gradient-to-br from-sky-400 to-sky-600 rounded-xl flex items-center justify-center">
+                <Wind className="w-5 h-5 text-white" />
               </div>
-              <span className="text-white font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>CoolBreeze PK</span>
+              <div>
+                <span className="text-white font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>{settings.brand_name}</span>
+                <p className="text-xs text-amber-300 font-semibold">{settings.brand_tagline}</p>
+              </div>
             </div>
-            <p className="text-sm text-center">Pakistan's #1 Imported Fan Store • Cash on Delivery • WhatsApp: +92-300-0000000</p>
-            <p className="text-sm">&copy; 2024 CoolBreeze PK</p>
+            <p className="text-sm text-center" data-testid="footer-tagline">{settings.footer_tagline}</p>
+            <p className="text-sm">&copy; 2024 {settings.brand_name}</p>
           </div>
         </div>
       </footer>

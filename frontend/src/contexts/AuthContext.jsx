@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const GUEST_ORDERS_KEY = "coolbreeze_guest_orders_v1";
 
 axios.defaults.withCredentials = true;
 
@@ -11,16 +12,31 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const linkGuestOrders = useCallback(async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(GUEST_ORDERS_KEY) || "[]");
+      if (stored.length === 0) return;
+      const r = await axios.post(`${API}/orders/link-guest`, { order_numbers: stored }, { withCredentials: true });
+      if (r.data?.linked > 0) {
+        // Successfully claimed; clear local cache
+        localStorage.removeItem(GUEST_ORDERS_KEY);
+      }
+    } catch {
+      /* non-blocking */
+    }
+  }, []);
+
   const checkAuth = useCallback(async () => {
     try {
       const r = await axios.get(`${API}/auth/me`, { withCredentials: true });
       setUser(r.data);
+      linkGuestOrders();
     } catch {
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [linkGuestOrders]);
 
   useEffect(() => {
     // CRITICAL: If returning from OAuth callback, skip the /me check.
@@ -46,10 +62,11 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh: checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh: checkAuth, linkGuestOrders }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export const useAuth = () => useContext(AuthContext);
+export const GUEST_ORDERS_STORAGE_KEY = GUEST_ORDERS_KEY;
