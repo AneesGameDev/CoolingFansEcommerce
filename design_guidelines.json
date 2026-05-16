@@ -1,0 +1,110 @@
+{
+  "theme": "light",
+  "archetype": "3 (Pastel & Soft - Cool Summer Edition)",
+  "typography": {
+    "fonts": {
+      "heading": "Outfit, sans-serif",
+      "body": "Plus Jakarta Sans, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl tracking-tight font-black text-slate-900",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-bold text-slate-900",
+      "h3": "text-xl sm:text-2xl font-semibold text-slate-800",
+      "h4": "text-lg sm:text-xl font-medium text-slate-800",
+      "body": "text-base leading-relaxed text-slate-600",
+      "small": "text-sm text-slate-500"
+    }
+  },
+  "colors": {
+    "background": "#F0F9FF",
+    "surface": "#FFFFFF",
+    "primary": "#0EA5E9",
+    "primary_hover": "#0284C7",
+    "accent_sale": "#F59E0B",
+    "text_primary": "#0F172A",
+    "text_secondary": "#475569",
+    "border": "#E2E8F0",
+    "glass_background": "rgba(255, 255, 255, 0.8)",
+    "glass_border": "rgba(255, 255, 255, 0.4)"
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "p-4, p-6, p-8, p-12",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "grid_product": "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6",
+    "border_radius": "rounded-2xl"
+  },
+  "components": {
+    "header": {
+      "style": "sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-slate-200 shadow-sm",
+      "instructions": "Must contain Logo/Brand name, navigation, and cart/CTA. Do not hide links on desktop."
+    },
+    "product_card": {
+      "style": "bg-white rounded-2xl p-4 shadow-sm border border-sky-100 hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex flex-col h-full",
+      "image_container": "aspect-square rounded-xl bg-slate-50 overflow-hidden mb-3",
+      "badge": "absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full",
+      "instructions": "Ensure images don't stretch. Title should be truncated to 2 lines."
+    },
+    "buttons": {
+      "primary": "bg-sky-500 hover:bg-sky-600 text-white rounded-full px-6 py-3 font-semibold transition-all duration-200 active:scale-95 flex items-center justify-center gap-2",
+      "secondary": "bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-full px-6 py-3 font-semibold transition-all duration-200 active:scale-95"
+    },
+    "whatsapp_chat": {
+      "style": "fixed bottom-6 right-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform cursor-pointer flex items-center justify-center",
+      "icon": "WhatsappIcon (from lucide-react or react-icons)"
+    },
+    "forms": {
+      "style": "Shadcn UI inputs heavily customized to have rounded-xl borders, bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 border-slate-200"
+    },
+    "badges": {
+      "sale": "bg-amber-500 text-white px-3 py-1 text-sm font-bold rounded-full uppercase tracking-wider shadow-sm"
+    }
+  },
+  "motion_and_interactions": {
+    "hover": "transition-all duration-300 ease-out",
+    "active": "active:scale-95",
+    "page_load": "framer-motion fade-in and slight slide-up staggered for grid items"
+  },
+  "icons": {
+    "library": "lucide-react",
+    "instructions": "Use lucide-react for UI icons. Install if not present."
+  },
+  "testing": {
+    "instructions": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case."
+  },
+  "media": {
+    "hero_banner": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/c45e7522-d961-4364-b390-eab81993ff47/images/c8bd0ccaa47155d0a87cd8ed08af402a6792c8aebb19382e9bb3ecf54ed7ad33.png",
+        "description": "Wide landscape hero banner for summer cooling fans, icy blue and white palette",
+        "category": "hero"
+      }
+    ],
+    "products": [
+      {
+        "url": "https://images.unsplash.com/photo-1564510182791-29645da7fac4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwzfHxwb3J0YWJsZSUyMG1pbmklMjBmYW58ZW58MHx8fHwxNzc4OTU2MTY3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Gray and white mini portable fan",
+        "category": "product"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1718815416565-c65944a5ec14?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwyfHxwb3J0YWJsZSUyMG1pbmklMjBmYW58ZW58MHx8fHwxNzc4OTU2MTY3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Pink portable mini fan",
+        "category": "product"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1565151443833-29bf2ba5dd8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxwZXJzb25hbCUyMGZhbnxlbnwwfHx8fDE3Nzg5NTYxNzd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "White desk fan",
+        "category": "product"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the Cool Blue & White summer theme.",
+    "Ensure mobile-first design: product grid should be 2 columns on mobile.",
+    "Do NOT hide desktop navigation behind a hamburger menu.",
+    "Implement the COD order form heavily prioritizing ease of use, including fields for Name, Phone, WhatsApp, Address, and Location.",
+    "Add 'data-testid' to all buttons, links, and forms.",
+    "Use Shadcn UI for forms, dialogs, and admin tables, but override default gray borders with rounded-xl, sky-tinted borders.",
+    "Seed the database with 10 products using the provided product images and realistic Pakistani pricing (PKR).",
+    "Display prominent 5-80% summer sale discount badges on product cards."
+  ]
+}
