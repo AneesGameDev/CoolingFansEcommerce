@@ -1,45 +1,33 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
-import { Wind, Menu, X, ShieldCheck, ShoppingBag, User, LogIn, LogOut, Package, ChevronDown } from "lucide-react";
+import { Wind, Menu, X, ShieldCheck, ShoppingBag, User, LogOut, Package, ChevronDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "./ui/dropdown-menu";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import GoogleLoginButton from "./GoogleLoginButton";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
-  const { user, login, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const { totalQty, setOpen: openCart } = useCart();
-
-  useEffect(() => {
-    if (!user) { setIsAdmin(false); return; }
-    axios.get(`${API}/admin/check-access`, { withCredentials: true })
-      .then((r) => setIsAdmin(!!r.data?.is_admin))
-      .catch(() => setIsAdmin(false));
-  }, [user]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-sky-100 shadow-sm" data-testid="site-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group flex-shrink-0" data-testid="header-logo">
             <div className="w-9 h-9 bg-gradient-to-br from-sky-400 to-sky-600 rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform">
               <Wind className="w-5 h-5 text-white" />
             </div>
             <div className="hidden xs:block">
               <span className="font-black text-lg sm:text-xl text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                CoolBreeze
+                OHo
               </span>
-              <span className="text-sky-500 font-black text-lg sm:text-xl" style={{ fontFamily: 'Outfit, sans-serif' }}> PK</span>
+              <span className="text-sky-500 font-black text-lg sm:text-xl" style={{ fontFamily: 'Outfit, sans-serif' }}> Mart</span>
             </div>
           </Link>
 
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-5">
             <Link to="/" className="text-slate-600 hover:text-sky-500 font-medium transition-colors" data-testid="nav-home">Home</Link>
             <Link to="/#products" className="text-slate-600 hover:text-sky-500 font-medium transition-colors" data-testid="nav-products">Products</Link>
@@ -55,9 +43,7 @@ export default function Header() {
             </a>
           </nav>
 
-          {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Cart */}
             <button
               onClick={() => openCart(true)}
               className="relative p-2 sm:px-3 sm:py-2 bg-sky-50 hover:bg-sky-100 rounded-full text-sky-700 transition-all"
@@ -72,7 +58,6 @@ export default function Header() {
               )}
             </button>
 
-            {/* User menu */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -84,6 +69,7 @@ export default function Header() {
                         <User className="w-4 h-4 text-sky-600" />
                       </div>
                     )}
+                    <span className="hidden sm:inline text-sm font-semibold text-slate-700 max-w-[120px] truncate">{user.name || user.email}</span>
                     <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden sm:block" />
                   </button>
                 </DropdownMenuTrigger>
@@ -106,23 +92,21 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <button
-                onClick={login}
-                className="hidden sm:flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-full font-semibold text-sm transition-all"
-                data-testid="login-btn"
-              >
-                <LogIn className="w-4 h-4" /> Sign in
-              </button>
+              <div className="hidden sm:block" data-testid="google-login-slot">
+                <GoogleLoginButton />
+              </div>
             )}
 
-            <Link
-              to="/admin"
-              className={`${isAdmin ? "hidden lg:flex" : "hidden"} items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-full font-semibold text-xs transition-all border border-amber-400/50`}
-              data-testid="admin-panel-btn"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-              Admin
-            </Link>
+            {user && isAdmin && (
+              <Link
+                to="/admin"
+                className="hidden lg:flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-full font-semibold text-xs transition-all border border-amber-400/50"
+                data-testid="admin-panel-btn"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                Admin Panel
+              </Link>
+            )}
 
             <button
               className="md:hidden p-2 text-slate-600 hover:text-sky-500"
@@ -134,7 +118,6 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-sky-100 py-3 space-y-1 animate-fade-in" data-testid="mobile-menu">
             <Link to="/" className="block px-4 py-2 text-slate-700 hover:text-sky-500 font-medium" onClick={() => setMenuOpen(false)}>Home</Link>
@@ -152,17 +135,15 @@ export default function Header() {
               WhatsApp Chat
             </a>
             {!user && (
-              <button
-                onClick={() => { setMenuOpen(false); login(); }}
-                className="block w-full text-left px-4 py-2 text-slate-900 font-bold"
-                data-testid="mobile-login-btn"
-              >
-                Sign in with Google
-              </button>
+              <div className="px-4 py-2" data-testid="mobile-google-login">
+                <GoogleLoginButton />
+              </div>
             )}
-            <Link to="/admin" className={`block px-4 py-2 text-slate-500 text-sm font-medium ${isAdmin ? "" : "hidden"}`} onClick={() => setMenuOpen(false)} data-testid="mobile-admin-link">
-              🛡️ Admin Panel
-            </Link>
+            {user && isAdmin && (
+              <Link to="/admin" className="block px-4 py-2 text-slate-900 font-bold flex items-center gap-2" onClick={() => setMenuOpen(false)} data-testid="mobile-admin-link">
+                <ShieldCheck className="w-4 h-4 text-amber-500" /> Admin Panel
+              </Link>
+            )}
           </div>
         )}
       </div>

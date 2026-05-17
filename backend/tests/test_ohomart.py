@@ -1,19 +1,19 @@
 """
-CoolBreeze PK Backend Tests
-Covers: Google auth (Emergent), reviews (auth-gated), multi-item orders,
+OHo Mart Backend Tests
+Covers: Google auth, reviews (auth-gated), multi-item orders,
 public tracking, my-orders, color_variants, video_url, total_sold, admin CRUD.
 """
 import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://portable-fan-hub.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ohomart.online").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@coolbreeze.pk"
+ADMIN_EMAIL = "admin@ohomart.pk"
 ADMIN_PASSWORD = "Admin@123"
 TEST_SESSION = "test_session_fixed_abc123"
-TEST_USER_EMAIL = "test.reviewer@coolbreeze.pk"
+TEST_USER_EMAIL = "test.reviewer@ohomart.pk"
 
 
 @pytest.fixture(scope="module")

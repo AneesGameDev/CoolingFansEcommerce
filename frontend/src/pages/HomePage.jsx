@@ -75,7 +75,7 @@ export default function HomePage() {
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20a%20fan.`}
+                href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20OHo Mart!%20I%20need%20help%20choosing%20a%20fan.`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-green-500 hover:bg-green-600 text-white font-bold px-5 sm:px-8 py-2.5 sm:py-4 rounded-full transition-all active:scale-95 inline-flex items-center justify-center gap-2 shadow-xl text-sm sm:text-base"
@@ -206,7 +206,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="inline-block bg-amber-100 text-amber-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
-              The CoolBreeze Promise
+              The OHo Mart Promise
             </div>
             <h2 className="text-3xl sm:text-5xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="why-buy-title">
               {settings.why_buy_title}
@@ -266,7 +266,7 @@ export default function HomePage() {
               <h2 className="text-3xl sm:text-5xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
                 Real Reviews from Real Homes
               </h2>
-              <p className="text-slate-500 mt-3">Verified buyers across Pakistan share their CoolBreeze experience.</p>
+              <p className="text-slate-500 mt-3">Verified buyers across Pakistan share their OHo Mart experience.</p>
             </div>
           </div>
           {/* Continuous left-sliding carousel — duplicates list for seamless loop, pauses on hover */}
@@ -340,7 +340,7 @@ export default function HomePage() {
           </h3>
           <p className="text-slate-600 mb-5" data-testid="whatsapp-cta-subtitle">{settings.whatsapp_cta_subtitle}</p>
           <a
-            href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20CoolBreeze!%20I%20need%20help%20choosing%20the%20right%20fan.`}
+            href={`https://wa.me/${settings.whatsapp_number || "923000000000"}?text=Hi%20OHo Mart!%20I%20need%20help%20choosing%20the%20right%20fan.`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3.5 rounded-full transition-all shadow-lg hover:shadow-xl active:scale-95"

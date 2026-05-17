@@ -1,5 +1,5 @@
 """
-CoolBreeze PK v2.1 — Tests for new features:
+OHo Mart v2.1 — Tests for new features:
 - Site Settings GET/PUT (with whitelist filter)
 - Admin Review with created_at override
 - Orders link-guest endpoint
@@ -10,13 +10,13 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://portable-fan-hub.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ohomart.online").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@coolbreeze.pk"
+ADMIN_EMAIL = "admin@ohomart.pk"
 ADMIN_PASSWORD = "Admin@123"
 TEST_SESSION = "test_session_fixed_abc123"
-TEST_USER_EMAIL = "test.reviewer@coolbreeze.pk"
+TEST_USER_EMAIL = "test.reviewer@ohomart.pk"
 
 EXPECTED_KEYS = [
     "brand_name", "brand_tagline", "whatsapp_number",

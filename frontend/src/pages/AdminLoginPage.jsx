@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
             <Wind className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-black text-slate-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            CoolBreeze PK
+            OHo Mart
           </h1>
           <p className="text-slate-500 text-sm mt-1">Admin Panel</p>
         </div>

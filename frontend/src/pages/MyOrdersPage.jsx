@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Package, ArrowLeft, ShoppingBag } from "lucide-react";
 import Header from "../components/Header";
 import { useAuth } from "../contexts/AuthContext";
+import GoogleLoginButton from "../components/GoogleLoginButton";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -17,7 +18,7 @@ const STATUS_COLORS = {
 
 export default function MyOrdersPage() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, login } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,13 +47,9 @@ export default function MyOrdersPage() {
           </div>
           <h1 className="text-2xl font-black text-slate-900 mb-2">Sign in to see your orders</h1>
           <p className="text-slate-500 mb-6">Login with Google to view all your past orders in one place.</p>
-          <button
-            onClick={login}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-full transition-all"
-            data-testid="my-orders-login-btn"
-          >
-            Sign in with Google
-          </button>
+          <div className="flex justify-center" data-testid="my-orders-login-btn">
+            <GoogleLoginButton />
+          </div>
         </div>
       </div>
     );

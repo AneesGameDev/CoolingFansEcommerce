@@ -82,10 +82,10 @@ export default function CheckoutPage() {
       const res = await axios.post(`${API}/orders`, orderData, { withCredentials: true });
       // Save order_number to localStorage so it can be claimed on signup/login later
       try {
-        const stored = JSON.parse(localStorage.getItem("coolbreeze_guest_orders_v1") || "[]");
+        const stored = JSON.parse(localStorage.getItem("ohomart_guest_orders_v1") || "[]");
         if (!stored.includes(res.data.order_number)) {
           stored.push(res.data.order_number);
-          localStorage.setItem("coolbreeze_guest_orders_v1", JSON.stringify(stored));
+          localStorage.setItem("ohomart_guest_orders_v1", JSON.stringify(stored));
         }
       } catch {}
       setSubmitted(true);

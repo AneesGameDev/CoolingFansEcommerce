@@ -5,14 +5,16 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request,
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 import os
 import logging
 import bcrypt
 import jwt
-import httpx
 import asyncio
 import resend
 import secrets
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
@@ -25,15 +27,20 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-JWT_SECRET = os.environ.get('JWT_SECRET', 'coolbreeze_secret_2024')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'ohomart_secret_2024')
 JWT_ALGORITHM = "HS256"
 WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '923000000000')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-ALLOWED_ADMIN_EMAILS = [
-    e.strip().lower() for e in os.environ.get('ALLOWED_ADMIN_EMAILS', '').split(',') if e.strip()
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@ohomart.online')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', '')
+ADMIN_EMAILS = [
+    e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()
 ]
-DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Admin@123')
+DEFAULT_ADMIN_PASSWORD = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'change-me')
+CORS_ORIGINS = [
+    o.strip() for o in os.environ.get('CORS_ORIGINS', 'https://ohomart.online,https://www.ohomart.online').split(',') if o.strip()
+]
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -53,24 +60,45 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
-def create_access_token(email: str) -> str:
-    payload = {"email": email, "role": "admin", "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
+def create_access_token(email: str, role: str = "admin") -> str:
+    payload = {"email": email, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_admin_user(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    token = authorization[7:]
+def _decode_jwt(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        if payload.get("role") != "admin":
-            raise HTTPException(status_code=403, detail="Admin access required")
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
+
+
+async def is_admin_user(email: str) -> bool:
+    if not email:
+        return False
+    doc = await db.admin_users.find_one({"email": email.lower(), "is_active": True}, {"_id": 0, "email": 1})
+    return doc is not None
+
+
+async def get_admin_user(
+    authorization: Optional[str] = Header(None),
+    session_token: Optional[str] = Cookie(None),
+):
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    elif session_token:
+        token = session_token
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = _decode_jwt(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    # Verify still active in DB
+    if not await is_admin_user(payload.get("email", "")):
+        raise HTTPException(status_code=403, detail="Admin access revoked")
+    return payload
 
 
 def doc_to_dict(d):
@@ -79,36 +107,31 @@ def doc_to_dict(d):
     return d
 
 
-# ---- User Auth Helpers (Emergent Google Auth) ----
+# ---- User Auth Helpers (Google ID token via JWT cookie) ----
 
 async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
     session_token: Optional[str] = Cookie(None),
 ):
-    """Returns the logged-in user or None. Use get_required_user for protected routes."""
+    """Returns the logged-in user or None. Decodes our own JWT cookie/header."""
     token = None
     if session_token:
         token = session_token
     elif authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
-
     if not token:
         return None
-
-    session = await db.user_sessions.find_one({"session_token": token})
-    if not session:
+    payload = _decode_jwt(token)
+    if not payload:
         return None
-
-    expires_at = session.get("expires_at")
-    if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at)
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at and expires_at < datetime.now(timezone.utc):
+    email = (payload.get("email") or "").lower()
+    if not email:
         return None
-
-    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        return None
+    user["is_admin"] = await is_admin_user(email)
     return user
 
 
@@ -116,6 +139,28 @@ async def get_required_user(user=Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=401, detail="Login required")
     return user
+
+
+def _set_session_cookie(response: Response, token: str):
+    kwargs = dict(
+        key="session_token",
+        value=token,
+        max_age=24 * 60 * 60,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    if COOKIE_DOMAIN:
+        kwargs["domain"] = COOKIE_DOMAIN
+    response.set_cookie(**kwargs)
+
+
+def _clear_session_cookie(response: Response):
+    kwargs = dict(key="session_token", path="/")
+    if COOKIE_DOMAIN:
+        kwargs["domain"] = COOKIE_DOMAIN
+    response.delete_cookie(**kwargs)
 
 
 # ---- Models ----
@@ -209,10 +254,6 @@ class AdminReviewCreate(BaseModel):
     created_at: Optional[str] = None  # Admin can override review date/time (ISO format)
 
 
-class SessionExchange(BaseModel):
-    session_id: str
-
-
 class LinkGuestOrders(BaseModel):
     order_numbers: List[str]
 
@@ -234,10 +275,26 @@ class TestimonialsBulkUpdate(BaseModel):
     testimonials: List[TestimonialItem]
 
 
+class GoogleAuthCredential(BaseModel):
+    credential: str
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+
+
+class AdminUserPatch(BaseModel):
+    password: Optional[str] = None
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 # ---- Default Site Settings ----
 
 DEFAULT_SITE_SETTINGS = {
-    "brand_name": "CoolBreeze PK",
+    "brand_name": "OHo Mart",
     "brand_tagline": "Beat the Heat with Premium Quality",
     "whatsapp_number": "923000000000",
     "hero_badge": "Pakistan's #1 Imported Fan Store",
@@ -249,7 +306,7 @@ DEFAULT_SITE_SETTINGS = {
     "sale_banner_primary": "🌡️ SUMMER SALE — UP TO 80% OFF",
     "sale_banner_secondary": "FREE DELIVERY on orders over Rs. 2000",
     "sale_banner_tertiary": "Limited Stock — Selling Fast!",
-    "why_buy_title": "Why Pakistan Trusts CoolBreeze",
+    "why_buy_title": "Why Pakistan Trusts OHo Mart",
     "why_buy_subtitle": "We import premium fans directly — no middlemen, no copies. Real quality, real cooling, real value.",
     "products_section_title": "Our Premium Fan Collection",
     "products_section_subtitle": "10 imported fans — each handpicked, each on sale, each ready to ship today.",
@@ -262,7 +319,7 @@ DEFAULT_SITE_SETTINGS = {
     "stats_cities_value": "100+",
     "stats_cities_label": "Cities Served",
     "founder_quote": "Every Pakistani family deserves real cooling comfort — not cheap copies. That's why we import directly from premium factories and stand behind every single fan we sell.",
-    "founder_name": "Team CoolBreeze",
+    "founder_name": "Team OHo Mart",
     "founder_role": "Bringing Real Cool to Real Homes",
     "guarantee_title": "100% Satisfaction Guarantee",
     "guarantee_text": "Open the box. Test the fan. Fall in love — or send it back, no questions asked.",
@@ -278,7 +335,7 @@ DEFAULT_SITE_SETTINGS = {
     "featured_testimonials": [
         {"name": "Ayesha K.", "city": "Karachi", "rating": 5, "quote": "The Neck Fan Pro is a game-changer in summer. Honestly the best Rs. 2500 I've spent this year!", "avatar": "https://i.pravatar.cc/100?img=47"},
         {"name": "Bilal R.", "city": "Lahore", "rating": 5, "quote": "Got it for load-shedding nights — my whole family loves it. Solid build, real battery life. Genuine product.", "avatar": "https://i.pravatar.cc/100?img=12"},
-        {"name": "Hira M.", "city": "Islamabad", "rating": 5, "quote": "I was scared to order COD online. But CoolBreeze delivered in 2 days, packaging was premium, fan works perfectly.", "avatar": "https://i.pravatar.cc/100?img=32"}
+        {"name": "Hira M.", "city": "Islamabad", "rating": 5, "quote": "I was scared to order COD online. But OHo Mart delivered in 2 days, packaging was premium, fan works perfectly.", "avatar": "https://i.pravatar.cc/100?img=32"}
     ]
 }
 
@@ -412,43 +469,32 @@ SEED_REVIEWS = [
 
 @app.on_event("startup")
 async def startup_event():
+    # Indexes
     await db.products.create_index("is_active")
+    try:
+        await db.products.create_index("slug", unique=True, sparse=True)
+    except Exception as e:
+        logger.warning(f"products.slug index: {e}")
     await db.orders.create_index("created_at")
-    await db.orders.create_index("order_number")
+    await db.orders.create_index("order_number", unique=True)
     await db.orders.create_index("user_email")
     await db.reviews.create_index("product_id")
     await db.admins.create_index("email", unique=True)
+    await db.admin_users.create_index("email", unique=True)
     await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
 
-    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@coolbreeze.pk')
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'Admin@123')
-    existing = await db.admins.find_one({"email": admin_email})
-    if not existing:
-        await db.admins.insert_one({
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "name": "CoolBreeze Admin",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        logger.info(f"Admin created: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.admins.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-
-    # Seed the three allowed admin Gmail accounts with shared password
-    SHARED_ADMIN_PASSWORD = "Anees@3221."
-    for email in ALLOWED_ADMIN_EMAILS:
-        existing_a = await db.admins.find_one({"email": email})
-        if not existing_a:
-            await db.admins.insert_one({
+    # Seed admin_users if empty (idempotent)
+    if await db.admin_users.count_documents({}) == 0 and ADMIN_EMAILS:
+        for email in ADMIN_EMAILS:
+            await db.admin_users.insert_one({
                 "email": email,
-                "password_hash": hash_password(SHARED_ADMIN_PASSWORD),
+                "password_hash": hash_password(DEFAULT_ADMIN_PASSWORD),
                 "name": email.split("@")[0].title(),
+                "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": "system_seed",
             })
-            logger.info(f"Allowed admin created: {email}")
+        logger.info(f"Seeded {len(ADMIN_EMAILS)} admin_users")
 
     count = await db.products.count_documents({})
     if count == 0:
@@ -489,7 +535,13 @@ async def startup_event():
     # Site settings seed (singleton document keyed by {"key": "main"})
     existing_settings = await db.site_settings.find_one({"key": "main"})
     if not existing_settings:
-        await db.site_settings.insert_one({"key": "main", **DEFAULT_SITE_SETTINGS})
+        await db.site_settings.insert_one({
+            "key": "main",
+            "brand": "OHo Mart",
+            "currency": "PKR",
+            "whatsapp": WHATSAPP_NUMBER,
+            **DEFAULT_SITE_SETTINGS,
+        })
         logger.info("Seeded default site settings")
     else:
         # Backfill any missing default keys
@@ -497,36 +549,41 @@ async def startup_event():
         if missing:
             await db.site_settings.update_one({"key": "main"}, {"$set": missing})
 
+    logger.info("OHo Mart backend ready.")
 
-# ---- Google Auth (Emergent-managed) ----
-# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 
-@api_router.post("/auth/session")
-async def auth_session(data: SessionExchange, response: Response):
-    """Exchange Emergent session_id for our session_token. Stores user, sets httpOnly cookie."""
-    async with httpx.AsyncClient() as http:
-        try:
-            r = await http.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": data.session_id},
-                timeout=15.0,
-            )
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Auth provider error: {e}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid session_id")
-    payload = r.json()
-    email = payload.get("email")
-    name = payload.get("name", "")
-    picture = payload.get("picture", "")
-    session_token = payload.get("session_token")
-    if not email or not session_token:
-        raise HTTPException(status_code=400, detail="Incomplete provider response")
+# ---- Google Auth (Google Identity Services — independent) ----
+
+@api_router.post("/auth/google")
+async def auth_google(data: GoogleAuthCredential, response: Response):
+    """Verify Google ID token, upsert user, issue our JWT cookie."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="Google auth not configured")
+    try:
+        idinfo = await asyncio.to_thread(
+            google_id_token.verify_oauth2_token,
+            data.credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+
+    email = (idinfo.get("email") or "").lower()
+    if not email or not idinfo.get("email_verified", False):
+        raise HTTPException(status_code=401, detail="Email not verified by Google")
+
+    name = idinfo.get("name", "")
+    picture = idinfo.get("picture", "")
+    now = datetime.now(timezone.utc)
 
     existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
-        user_id = existing["user_id"]
-        await db.users.update_one({"email": email}, {"$set": {"name": name, "picture": picture}})
+        await db.users.update_one(
+            {"email": email},
+            {"$set": {"name": name, "picture": picture, "last_login_at": now.isoformat()}},
+        )
+        user_id = existing.get("user_id") or f"user_{uuid.uuid4().hex[:12]}"
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
         await db.users.insert_one({
@@ -534,64 +591,49 @@ async def auth_session(data: SessionExchange, response: Response):
             "email": email,
             "name": name,
             "picture": picture,
-            "created_at": datetime.now(timezone.utc),
+            "provider": "google",
+            "created_at": now.isoformat(),
+            "last_login_at": now.isoformat(),
         })
 
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc),
-    })
+    admin_flag = await is_admin_user(email)
+    token = create_access_token(email, role="admin" if admin_flag else "user")
+    _set_session_cookie(response, token)
 
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        max_age=7 * 24 * 60 * 60,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        path="/",
-    )
-
-    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+    return {
+        "id": user_id,
+        "email": email,
+        "name": name,
+        "picture": picture,
+        "is_admin": admin_flag,
+    }
 
 
 @api_router.get("/auth/me")
 async def auth_me(user=Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    # Strip mongo-internal/sensitive fields
     return {
         "user_id": user.get("user_id"),
         "email": user.get("email"),
         "name": user.get("name"),
         "picture": user.get("picture"),
+        "is_admin": bool(user.get("is_admin")),
     }
 
 
 @api_router.post("/auth/logout")
-async def auth_logout(
-    response: Response,
-    session_token: Optional[str] = Cookie(None),
-    authorization: Optional[str] = Header(None),
-):
-    token = session_token
-    if not token and authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-    if token:
-        await db.user_sessions.delete_one({"session_token": token})
-    response.delete_cookie("session_token", path="/", samesite="none", secure=True)
+async def auth_logout(response: Response):
+    _clear_session_cookie(response)
     return {"message": "Logged out"}
 
 
-# ---- Admin Auth ----
+# ---- Admin Auth (email + password against admin_users) ----
 
 @api_router.post("/admin/login")
 async def admin_login(data: AdminLogin):
     email = data.email.strip().lower()
-    admin = await db.admins.find_one({"email": email})
+    admin = await db.admin_users.find_one({"email": email, "is_active": True})
     if not admin or not verify_password(data.password, admin["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(admin["email"])
@@ -605,10 +647,79 @@ async def admin_me(current_admin=Depends(get_admin_user)):
 
 @api_router.get("/admin/check-access")
 async def admin_check_access(user=Depends(get_required_user)):
-    """Returns whether the currently-signed-in Google user is an authorized admin."""
+    """Returns whether the currently-signed-in user is an authorized admin."""
     email = (user.get("email") or "").lower()
-    allowed = email in ALLOWED_ADMIN_EMAILS
-    return {"is_admin": allowed, "email": email}
+    return {"is_admin": await is_admin_user(email), "email": email}
+
+
+# ---- Admin Users CRUD ----
+
+@api_router.get("/admin/admins")
+async def list_admins(current_admin=Depends(get_admin_user)):
+    docs = await db.admin_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    return docs
+
+
+@api_router.post("/admin/admins")
+async def create_admin(data: AdminUserCreate, current_admin=Depends(get_admin_user)):
+    email = data.email.lower()
+    if len(data.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    existing = await db.admin_users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Admin already exists")
+    doc = {
+        "email": email,
+        "password_hash": hash_password(data.password),
+        "name": data.name or email.split("@")[0].title(),
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_admin.get("email"),
+    }
+    await db.admin_users.insert_one(doc)
+    doc.pop("password_hash", None)
+    return doc
+
+
+@api_router.patch("/admin/admins/{email}")
+async def update_admin(email: str, data: AdminUserPatch, current_admin=Depends(get_admin_user)):
+    email = email.lower()
+    target = await db.admin_users.find_one({"email": email})
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    update = {}
+    if data.password is not None:
+        if len(data.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        update["password_hash"] = hash_password(data.password)
+    if data.name is not None:
+        update["name"] = data.name
+    if data.is_active is not None:
+        if not data.is_active and target.get("is_active"):
+            active_count = await db.admin_users.count_documents({"is_active": True})
+            if active_count <= 1:
+                raise HTTPException(status_code=400, detail="Cannot deactivate the last active admin")
+        update["is_active"] = data.is_active
+    if not update:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.admin_users.update_one({"email": email}, {"$set": update})
+    doc = await db.admin_users.find_one({"email": email}, {"_id": 0, "password_hash": 0})
+    return doc
+
+
+@api_router.delete("/admin/admins/{email}")
+async def delete_admin(email: str, current_admin=Depends(get_admin_user)):
+    email = email.lower()
+    target = await db.admin_users.find_one({"email": email})
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    if target.get("is_active"):
+        active_count = await db.admin_users.count_documents({"is_active": True})
+        if active_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot delete the last active admin")
+    await db.admin_users.delete_one({"email": email})
+    return {"message": "Admin deleted"}
 
 
 async def _send_email_async(to_email: str, subject: str, html: str):
@@ -631,7 +742,7 @@ async def _send_email_async(to_email: str, subject: str, html: str):
 async def admin_forgot_password(data: AdminForgotPassword):
     """Send a 6-digit reset code to the admin's email. Always returns success to prevent enumeration."""
     email = data.email.strip().lower()
-    admin = await db.admins.find_one({"email": email})
+    admin = await db.admin_users.find_one({"email": email, "is_active": True})
     if admin:
         code = "".join(secrets.choice("0123456789") for _ in range(6))
         await db.admin_reset_codes.update_one(
@@ -648,7 +759,7 @@ async def admin_forgot_password(data: AdminForgotPassword):
         html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #F0F9FF; border-radius: 16px;">
           <div style="text-align: center; background: linear-gradient(135deg, #0EA5E9, #06B6D4); padding: 24px; border-radius: 12px; color: white;">
-            <h1 style="margin: 0; font-size: 22px;">CoolBreeze PK — Admin Reset</h1>
+            <h1 style="margin: 0; font-size: 22px;">OHo Mart — Admin Reset</h1>
             <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">Password reset code</p>
           </div>
           <div style="background: white; margin-top: 16px; padding: 24px; border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -661,9 +772,7 @@ async def admin_forgot_password(data: AdminForgotPassword):
           <p style="text-align: center; margin-top: 16px; color: #94A3B8; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
         </div>
         """
-        result = await _send_email_async(email, "CoolBreeze Admin Password Reset Code", html)
-        # When using onboarding@resend.dev, Resend only delivers to the account owner's verified email.
-        # Return success regardless to prevent enumeration; log result for debugging.
+        result = await _send_email_async(email, "OHo Mart Admin Password Reset Code", html)
         logger.info(f"Reset code sent to {email}: send_result={result}")
     return {"message": "If this email is registered, a reset code has been sent."}
 
@@ -689,8 +798,7 @@ async def admin_reset_password(data: AdminResetPassword):
     if not verify_password(data.code, record["code_hash"]):
         await db.admin_reset_codes.update_one({"email": email}, {"$inc": {"attempts": 1}})
         raise HTTPException(status_code=400, detail="Invalid code")
-    # Update password
-    result = await db.admins.update_one(
+    result = await db.admin_users.update_one(
         {"email": email},
         {"$set": {"password_hash": hash_password(data.new_password), "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
@@ -992,12 +1100,10 @@ async def get_admin_stats(current_admin=Depends(get_admin_user)):
 
 app.include_router(api_router)
 
-# Note: when allow_credentials=True we cannot use "*" for origins.
-# Allow all via regex which still permits credentials with all origins.
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origin_regex=".*",
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

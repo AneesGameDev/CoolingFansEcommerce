@@ -155,7 +155,7 @@ export default function OrderTrackPage() {
               </div>
 
               <a
-                href={`https://wa.me/923000000000?text=Hi%20CoolBreeze!%20I%20want%20to%20ask%20about%20order%20${encodeURIComponent(order.order_number)}`}
+                href={`https://wa.me/923000000000?text=Hi%20OHo Mart!%20I%20want%20to%20ask%20about%20order%20${encodeURIComponent(order.order_number)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-all"

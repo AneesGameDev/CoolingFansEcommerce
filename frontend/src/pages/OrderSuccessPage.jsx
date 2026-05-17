@@ -17,7 +17,7 @@ export default function OrderSuccessPage() {
 
   const itemSummary = items.map((it) => `${it.product_name} (x${it.quantity})`).join(", ");
   const waMessage = encodeURIComponent(
-    `Hi CoolBreeze PK! I just placed an order.\n\nOrder #: ${order.order_number}\nItems: ${itemSummary}\nTotal: Rs. ${order.total_price.toLocaleString()}\nName: ${order.customer_name}\nPhone: ${order.phone}\nAddress: ${order.address}, ${order.city}${order.province ? `, ${order.province}` : ""}`
+    `Hi OHo Mart! I just placed an order.\n\nOrder #: ${order.order_number}\nItems: ${itemSummary}\nTotal: Rs. ${order.total_price.toLocaleString()}\nName: ${order.customer_name}\nPhone: ${order.phone}\nAddress: ${order.address}, ${order.city}${order.province ? `, ${order.province}` : ""}`
   );
 
   const statusColors = {

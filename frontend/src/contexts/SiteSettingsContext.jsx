@@ -4,7 +4,7 @@ import axios from "axios";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const FALLBACK = {
-  brand_name: "CoolBreeze PK",
+  brand_name: "OHo Mart",
   brand_tagline: "Beat the Heat with Premium Quality",
   hero_badge: "Pakistan's #1 Imported Fan Store",
   hero_title_main: "Beat the Heat with",
@@ -23,7 +23,7 @@ const FALLBACK = {
   stats_orders_value: "12,000+", stats_orders_label: "Orders Delivered",
   stats_rating_value: "4.9/5", stats_rating_label: "Customer Rating",
   stats_cities_value: "100+", stats_cities_label: "Cities Served",
-  founder_quote: "Real cooling for real homes.", founder_name: "Team CoolBreeze", founder_role: "",
+  founder_quote: "Real cooling for real homes.", founder_name: "Team OHo Mart", founder_role: "",
   guarantee_title: "100% Satisfaction Guarantee",
   guarantee_text: "Test it, love it, or send it back.",
   whatsapp_cta_title: "Need Help?", whatsapp_cta_subtitle: "Chat with us on WhatsApp.",

@@ -300,6 +300,60 @@ export default function AdminDashboard() {
     setSettingsForm(next);
   }, [siteSettings]);
 
+  // ---- Admin Users management ----
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newAdminForm, setNewAdminForm] = useState({ email: "", name: "", password: "" });
+
+  const loadAdminUsers = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API}/admin/admins`, getConfig());
+      setAdminUsers(r.data || []);
+    } catch (e) {
+      console.error("Failed to load admin users:", e?.message || e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "admins") loadAdminUsers();
+  }, [tab, loadAdminUsers]);
+
+  const handleCreateAdmin = async () => {
+    if (!newAdminForm.email || !newAdminForm.password) { alert("Email and password are required"); return; }
+    if (newAdminForm.password.length < 8) { alert("Password must be at least 8 characters"); return; }
+    try {
+      await axios.post(`${API}/admin/admins`, newAdminForm, getConfig());
+      setShowAddAdmin(false);
+      setNewAdminForm({ email: "", name: "", password: "" });
+      loadAdminUsers();
+    } catch (e) { alert("Failed: " + (e.response?.data?.detail || e.message)); }
+  };
+
+  const handleToggleAdmin = async (email, is_active) => {
+    try {
+      await axios.patch(`${API}/admin/admins/${encodeURIComponent(email)}`, { is_active: !is_active }, getConfig());
+      loadAdminUsers();
+    } catch (e) { alert("Failed: " + (e.response?.data?.detail || e.message)); }
+  };
+
+  const handleChangeAdminPassword = async (email) => {
+    const pw = window.prompt(`New password for ${email} (min 8 chars):`);
+    if (!pw) return;
+    if (pw.length < 8) { alert("Password must be at least 8 characters"); return; }
+    try {
+      await axios.patch(`${API}/admin/admins/${encodeURIComponent(email)}`, { password: pw }, getConfig());
+      alert("Password updated");
+    } catch (e) { alert("Failed: " + (e.response?.data?.detail || e.message)); }
+  };
+
+  const handleDeleteAdmin = async (email) => {
+    if (!window.confirm(`Delete admin ${email}?`)) return;
+    try {
+      await axios.delete(`${API}/admin/admins/${encodeURIComponent(email)}`, getConfig());
+      loadAdminUsers();
+    } catch (e) { alert("Failed: " + (e.response?.data?.detail || e.message)); }
+  };
+
   const saveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -349,6 +403,7 @@ export default function AdminDashboard() {
     { key: "orders", label: `Orders (${orders.length})`, icon: ShoppingCart },
     { key: "products", label: `Products (${products.length})`, icon: Package },
     { key: "reviews", label: `Reviews (${reviews.length})`, icon: Star },
+    { key: "admins", label: "Admin Users", icon: Users },
     { key: "site", label: "Site Content", icon: Settings },
   ];
 
@@ -361,7 +416,7 @@ export default function AdminDashboard() {
             <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center">
               <Wind className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white font-bold text-sm hidden sm:block" style={{ fontFamily: 'Outfit, sans-serif' }}>CoolBreeze PK</span>
+            <span className="text-white font-bold text-sm hidden sm:block" style={{ fontFamily: 'Outfit, sans-serif' }}>OHo Mart</span>
           </Link>
           <span className="text-slate-500 text-sm hidden sm:block">/ Admin Panel</span>
         </div>
@@ -552,7 +607,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="flex gap-2">
                             <a
-                              href={`https://wa.me/${order.whatsapp?.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(order.customer_name)}!%20Your%20CoolBreeze%20order%20${order.order_number}%20is%20confirmed.`}
+                              href={`https://wa.me/${order.whatsapp?.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(order.customer_name)}!%20Your%20OHo Mart%20order%20${order.order_number}%20is%20confirmed.`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-all"

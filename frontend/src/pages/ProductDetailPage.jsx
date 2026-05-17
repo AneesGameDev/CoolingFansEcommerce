@@ -7,6 +7,7 @@ import StarRating from "../components/StarRating";
 import ImageLightbox from "../components/ImageLightbox";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
+import GoogleLoginButton from "../components/GoogleLoginButton";
 import { toast } from "sonner";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -15,7 +16,7 @@ const MAX_IMG_BYTES = 1.5 * 1024 * 1024; // 1.5MB cap per image
 export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user } = useAuth();
   const { addItem } = useCart();
   const fileInputRef = useRef(null);
 
@@ -115,7 +116,7 @@ export default function ProductDetailPage() {
 
   const submitReview = async (e) => {
     e.preventDefault();
-    if (!user) { login(); return; }
+    if (!user) { toast.error("Please sign in with Google to leave a review"); return; }
     if (!reviewForm.comment.trim()) {
       toast.error("Please write a comment");
       return;
@@ -486,13 +487,9 @@ export default function ProductDetailPage() {
               <div className="text-center py-6 px-4 bg-sky-50 rounded-2xl border border-sky-100" data-testid="review-login-required">
                 <p className="text-slate-700 font-semibold mb-1">Sign in to share your review</p>
                 <p className="text-sm text-slate-500 mb-4">Only verified Google-signed in users can leave reviews.</p>
-                <button
-                  onClick={login}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-full transition-all inline-flex items-center gap-2"
-                  data-testid="review-login-btn"
-                >
-                  Sign in with Google
-                </button>
+                <div className="flex justify-center" data-testid="review-login-btn">
+                  <GoogleLoginButton />
+                </div>
               </div>
             ) : (
               <>

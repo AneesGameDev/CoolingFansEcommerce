@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const GUEST_ORDERS_KEY = "coolbreeze_guest_orders_v1";
+const GUEST_ORDERS_KEY = "ohomart_guest_orders_v1";
 
 axios.defaults.withCredentials = true;
 
@@ -18,11 +18,10 @@ export function AuthProvider({ children }) {
       if (stored.length === 0) return;
       const r = await axios.post(`${API}/orders/link-guest`, { order_numbers: stored }, { withCredentials: true });
       if (r.data?.linked > 0) {
-        // Successfully claimed; clear local cache
         localStorage.removeItem(GUEST_ORDERS_KEY);
       }
-    } catch {
-      /* non-blocking */
+    } catch (e) {
+      console.error("link-guest failed:", e?.message || e);
     }
   }, []);
 
@@ -39,30 +38,35 @@ export function AuthProvider({ children }) {
   }, [linkGuestOrders]);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes("session_id=")) {
-      setLoading(false);
-      return;
-    }
     checkAuth();
   }, [checkAuth]);
 
-  const login = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
+  const handleGoogleCredential = useCallback(async (credential) => {
+    await axios.post(`${API}/auth/google`, { credential }, { withCredentials: true });
+    await checkAuth();
+  }, [checkAuth]);
 
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-    } catch {}
+    } catch (e) {
+      console.error("logout failed:", e?.message || e);
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh: checkAuth, linkGuestOrders }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isAdmin: !!user?.is_admin,
+        handleGoogleCredential,
+        logout,
+        refresh: checkAuth,
+        linkGuestOrders,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

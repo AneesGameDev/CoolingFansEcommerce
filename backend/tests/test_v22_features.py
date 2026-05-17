@@ -1,5 +1,5 @@
 """
-Tests for CoolBreeze PK v2.2 features:
+Tests for OHo Mart v2.2 features:
 - Multi-admin login (3 shared Gmails)
 - /admin/check-access endpoint
 - /admin/forgot-password and /admin/reset-password flow
@@ -14,12 +14,12 @@ import requests
 from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://portable-fan-hub.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://ohomart.online').rstrip('/')
 API = f"{BASE_URL}/api"
 
 # Direct mongo connection for DB-backed verification (reset codes)
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-DB_NAME = os.environ.get('DB_NAME', 'coolbreeze_db')
+DB_NAME = os.environ.get('DB_NAME', 'ohomart_db')
 mongo = MongoClient(MONGO_URL)
 db = mongo[DB_NAME]
 
@@ -45,7 +45,7 @@ def test_admin_login_wrong_password_401():
 
 
 def test_legacy_admin_still_works():
-    r = requests.post(f"{API}/admin/login", json={"email": "admin@coolbreeze.pk", "password": "Admin@123"})
+    r = requests.post(f"{API}/admin/login", json={"email": "admin@ohomart.pk", "password": "Admin@123"})
     assert r.status_code == 200
 
 
@@ -60,7 +60,7 @@ def test_check_access_non_admin_user_returns_false():
     # Make sure test session exists
     db.users.update_one(
         {"user_id": "test-user-fixed-001"},
-        {"$set": {"user_id": "test-user-fixed-001", "email": "test.reviewer@coolbreeze.pk", "name": "Test Reviewer"}},
+        {"$set": {"user_id": "test-user-fixed-001", "email": "test.reviewer@ohomart.pk", "name": "Test Reviewer"}},
         upsert=True,
     )
     db.user_sessions.update_one(
@@ -76,7 +76,7 @@ def test_check_access_non_admin_user_returns_false():
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["is_admin"] is False
-    assert data["email"] == "test.reviewer@coolbreeze.pk"
+    assert data["email"] == "test.reviewer@ohomart.pk"
 
 
 def test_check_access_allowed_admin_returns_true():
