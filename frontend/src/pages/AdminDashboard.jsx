@@ -783,6 +783,149 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ---- ADMIN USERS ---- */}
+        {tab === "admins" && (
+          <div data-testid="admins-tab">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-black text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>Admin Users</h2>
+                <p className="text-slate-400 text-sm mt-1">Manage who can access this admin panel. Each email + password pair can log into /admin.</p>
+              </div>
+              <button
+                onClick={() => setShowAddAdmin(true)}
+                className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all"
+                data-testid="add-admin-btn"
+              >
+                <Plus className="w-4 h-4" />
+                Add Admin
+              </button>
+            </div>
+
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-700/50">
+                    <tr>
+                      {["Name", "Email", "Status", "Created", "Actions"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-slate-400 font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminUsers.map(u => (
+                      <tr key={u.email} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors" data-testid={`admin-user-row-${u.email}`}>
+                        <td className="px-4 py-3 text-white font-medium">{u.name || "—"}</td>
+                        <td className="px-4 py-3 text-sky-400 font-mono text-xs">{u.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${u.is_active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                            {u.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={() => handleChangeAdminPassword(u.email)}
+                              className="text-xs bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg font-medium transition-all"
+                              data-testid={`change-pw-btn-${u.email}`}
+                            >
+                              Reset PW
+                            </button>
+                            <button
+                              onClick={() => handleToggleAdmin(u.email, u.is_active)}
+                              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all ${u.is_active ? "bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white" : "bg-green-600/30 hover:bg-green-600 text-green-300 hover:text-white"}`}
+                              data-testid={`toggle-admin-btn-${u.email}`}
+                            >
+                              {u.is_active ? "Deactivate" : "Activate"}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAdmin(u.email)}
+                              className="text-xs bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white px-2.5 py-1.5 rounded-lg font-medium transition-all"
+                              data-testid={`delete-admin-btn-${u.email}`}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {adminUsers.length === 0 && (
+                  <div className="text-center py-12 text-slate-500">
+                    <Users className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p>No admin users found. Click "Add Admin" to add one.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Add Admin Modal */}
+            {showAddAdmin && (
+              <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" data-testid="add-admin-modal">
+                <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md">
+                  <div className="flex items-center justify-between p-5 border-b border-slate-700">
+                    <h3 className="text-lg font-black text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>Add New Admin</h3>
+                    <button onClick={() => { setShowAddAdmin(false); setNewAdminForm({ email: "", name: "", password: "" }); }} className="text-slate-400 hover:text-white">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-1">Email *</label>
+                      <input
+                        type="email"
+                        value={newAdminForm.email}
+                        onChange={e => setNewAdminForm(p => ({ ...p, email: e.target.value }))}
+                        placeholder="admin@ohomart.pk"
+                        className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        data-testid="new-admin-email-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-1">Name (optional)</label>
+                      <input
+                        type="text"
+                        value={newAdminForm.name}
+                        onChange={e => setNewAdminForm(p => ({ ...p, name: e.target.value }))}
+                        placeholder="Admin Name"
+                        className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        data-testid="new-admin-name-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-1">Password * (min 8 chars)</label>
+                      <input
+                        type="password"
+                        value={newAdminForm.password}
+                        onChange={e => setNewAdminForm(p => ({ ...p, password: e.target.value }))}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        data-testid="new-admin-password-input"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={handleCreateAdmin}
+                        className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-xl transition-all"
+                        data-testid="create-admin-submit-btn"
+                      >
+                        Create Admin
+                      </button>
+                      <button
+                        onClick={() => { setShowAddAdmin(false); setNewAdminForm({ email: "", name: "", password: "" }); }}
+                        className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3 rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ---- SITE CONTENT ---- */}
         {tab === "site" && (
           <div data-testid="site-content-tab">

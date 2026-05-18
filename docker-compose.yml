@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: ohomart_mongo
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - ohomart_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ohomart_backend
+    restart: always
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongodb
+    networks:
+      - ohomart_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: https://ohomart.online
+        REACT_APP_GOOGLE_CLIENT_ID: 845488070993-ak986ktr940p9nuk2aciqquhidn01mat.apps.googleusercontent.com
+    container_name: ohomart_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    networks:
+      - ohomart_net
+
+volumes:
+  mongo_data:
+
+networks:
+  ohomart_net:
+    driver: bridge
