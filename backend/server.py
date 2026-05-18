@@ -272,6 +272,7 @@ class ReviewCreate(BaseModel):
 class AdminReviewCreate(BaseModel):
     product_id: str
     reviewer_name: str
+    reviewer_avatar: Optional[str] = ""
     rating: int
     comment: str
     images: List[str] = []
