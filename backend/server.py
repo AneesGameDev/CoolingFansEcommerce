@@ -1154,6 +1154,23 @@ async def update_testimonials(data: TestimonialsBulkUpdate, current_admin=Depend
     return {"featured_testimonials": items}
 
 
+# ---- Health Check ----
+
+@api_router.get("/health")
+async def health_check():
+    """Liveness + DB ping. Used by load balancers, Docker healthcheck, hosting platforms."""
+    try:
+        await client.admin.command("ping")
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {e}"
+    return {
+        "service": "ohomart-backend",
+        "status": "ok" if db_status == "ok" else "degraded",
+        "db": db_status,
+    }
+
+
 # ---- Admin Stats ----
 
 @api_router.get("/admin/stats")

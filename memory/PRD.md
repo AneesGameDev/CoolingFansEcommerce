@@ -18,7 +18,7 @@ Must be independently deployable on ohomart.online with no manual DB setup.
 4. Google Sign-In for customers
 5. Admin panel: products, orders, reviews, site content, admin user management
 6. Zero manual DB setup — auto creates collections/indexes/seeds on startup
-7. No Emergent branding anywhere
+7. No third-party platform branding anywhere
 8. Independently deployable via Docker or manual
 
 ## User Personas

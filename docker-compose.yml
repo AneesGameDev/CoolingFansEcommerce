@@ -20,6 +20,9 @@ services:
       - "8001:8001"
     env_file:
       - ./backend/.env
+    environment:
+      # Override MONGO_URL so the backend container reaches the mongodb service by name
+      - MONGO_URL=mongodb://mongodb:27017
     depends_on:
       - mongodb
     networks:
@@ -30,12 +33,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_BACKEND_URL: https://ohomart.online
-        REACT_APP_GOOGLE_CLIENT_ID: 845488070993-ak986ktr940p9nuk2aciqquhidn01mat.apps.googleusercontent.com
+        # These bake REACT_APP_* into the React bundle at build time.
+        # Override from the shell: REACT_APP_BACKEND_URL=https://yourdomain.com docker compose up --build
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-https://ohomart.online}
+        REACT_APP_GOOGLE_CLIENT_ID: ${REACT_APP_GOOGLE_CLIENT_ID:-845488070993-ak986ktr940p9nuk2aciqquhidn01mat.apps.googleusercontent.com}
     container_name: ohomart_frontend
     restart: always
     ports:
       - "3000:80"
+    depends_on:
+      - backend
     networks:
       - ohomart_net
 

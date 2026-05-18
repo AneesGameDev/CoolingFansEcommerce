@@ -85,6 +85,7 @@ export default function AdminDashboard() {
     const token = localStorage.getItem("adminToken");
     if (!token) { navigate("/admin"); return; }
     loadAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const loadAll = async () => {
