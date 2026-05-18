@@ -87,7 +87,7 @@ export default function CheckoutPage() {
           stored.push(res.data.order_number);
           localStorage.setItem("ohomart_guest_orders_v1", JSON.stringify(stored));
         }
-      } catch {}
+      } catch (e) { /* guest order-linking is non-critical — proceed silently */ }
       setSubmitted(true);
       navigate("/order-success", { state: { order: res.data } });
       clear();

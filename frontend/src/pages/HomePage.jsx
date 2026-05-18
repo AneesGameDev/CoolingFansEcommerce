@@ -131,8 +131,8 @@ export default function HomePage() {
       <section className="hidden sm:block bg-slate-900 text-white py-8 border-y-4 border-amber-400" data-testid="stats-strip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {stats.map((s, i) => (
-              <div key={i} className="flex flex-col items-center gap-1" data-testid={`stat-${i}`}>
+            {stats.map((s) => (
+              <div key={s.label} className="flex flex-col items-center gap-1" data-testid={`stat-${s.label}`}>
                 <s.icon className={`w-6 h-6 mb-1 ${s.color}`} />
                 <p className="text-2xl sm:text-3xl font-black text-white">{s.value}</p>
                 <p className="text-xs sm:text-sm text-slate-400 font-semibold uppercase tracking-wider">{s.label}</p>
@@ -145,8 +145,8 @@ export default function HomePage() {
       {/* Mobile-only compact stats row */}
       <section className="sm:hidden bg-slate-900 text-white py-3 border-y-2 border-amber-400">
         <div className="grid grid-cols-4 gap-1 text-center px-2">
-          {stats.map((s, i) => (
-            <div key={i} className="flex flex-col items-center">
+          {stats.map((s) => (
+            <div key={s.label} className="flex flex-col items-center">
               <p className="text-sm font-black text-white">{s.value}</p>
               <p className="text-[8px] text-slate-400 uppercase tracking-wide leading-tight">{s.label}</p>
             </div>
@@ -179,8 +179,8 @@ export default function HomePage() {
               { icon: "🌬️", title: "Turbo Speed", desc: "Real cooling power" },
               { icon: "🔇", title: "Ultra Quiet", desc: "< 35dB whisper mode" },
               { icon: "🏅", title: "Certified Imports", desc: "Premium tested quality" },
-            ].map((f, i) => (
-              <div key={i} className="flex flex-col items-center gap-1 p-2">
+            ].map((f) => (
+              <div key={f.title} className="flex flex-col items-center gap-1 p-2">
                 <span className="text-2xl">{f.icon}</span>
                 <p className="font-bold text-slate-800 text-sm">{f.title}</p>
                 <p className="text-xs text-slate-500">{f.desc}</p>
@@ -206,7 +206,7 @@ export default function HomePage() {
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" data-testid="products-loading">
             {[...Array(PER_PAGE)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-sky-100 overflow-hidden animate-pulse">
+              <div key={`skeleton-${i}`} className="bg-white rounded-2xl border border-sky-100 overflow-hidden animate-pulse">
                 <div className="aspect-square bg-slate-100" />
                 <div className="p-4 space-y-2">
                   <div className="h-4 bg-slate-100 rounded w-3/4" />
@@ -285,9 +285,9 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {WHY_BUY.map((b, i) => (
               <div
-                key={i}
+                key={b.title}
                 className="group bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-2xl p-6 hover:shadow-xl hover:border-sky-300 hover:-translate-y-1 transition-all duration-300"
-                data-testid={`why-buy-${i}`}
+                data-testid={`why-buy-${b.title}`}
               >
                 <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${b.color} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-lg`}>
                   <b.icon className="w-7 h-7 text-white" />
@@ -304,7 +304,7 @@ export default function HomePage() {
       <section className="relative py-14 overflow-hidden bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" data-testid="guarantee-section">
         <div className="absolute inset-0 opacity-10">
           {[...Array(8)].map((_, i) => (
-            <ShieldCheck key={i} className="absolute text-white" style={{
+            <ShieldCheck key={`shield-${i}`} className="absolute text-white" style={{
               width: `${40 + i * 15}px`, height: `${40 + i * 15}px`,
               top: `${(i * 13) % 100}%`, left: `${(i * 17) % 100}%`,
             }} />
@@ -345,7 +345,7 @@ export default function HomePage() {
             >
               {[...testimonials, ...testimonials].map((t, i) => (
                 <div
-                  key={i}
+                  key={`${t.name || "t"}-${i}`}
                   className="bg-white rounded-2xl p-6 border border-sky-100 hover:shadow-xl transition-all relative w-[300px] sm:w-[360px] flex-shrink-0"
                   data-testid={`testimonial-${i % testimonials.length}`}
                 >

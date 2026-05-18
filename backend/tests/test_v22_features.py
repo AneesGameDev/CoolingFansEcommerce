@@ -24,8 +24,14 @@ mongo = MongoClient(MONGO_URL)
 db = mongo[DB_NAME]
 
 ALLOWED = ["ockmicrosoft.games@gmail.com", "tradebyabdul@gmail.com", "royalu101@gmail.com"]
-SHARED_PASSWORD = "Anees@3221."
-TEST_SESSION_TOKEN = "test_session_fixed_abc123"
+SHARED_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")  # set in env — never hardcode
+TEST_SESSION_TOKEN = os.getenv("TEST_SESSION_TOKEN", "test_session_fixed_abc123")
+
+if not SHARED_PASSWORD:
+    raise RuntimeError(
+        "Set TEST_ADMIN_PASSWORD environment variable before running tests.\n"
+        "  export TEST_ADMIN_PASSWORD='Admin@OHoMart2024'"
+    )
 
 
 # ----- Multi-admin login -----
@@ -75,7 +81,7 @@ def test_check_access_non_admin_user_returns_false():
     r = requests.get(f"{API}/admin/check-access", headers={"Authorization": f"Bearer {TEST_SESSION_TOKEN}"})
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["is_admin"] is False
+    assert data["is_admin"] == False
     assert data["email"] == "test.reviewer@ohomart.pk"
 
 
@@ -105,7 +111,7 @@ def test_check_access_allowed_admin_returns_true():
         r = requests.get(f"{API}/admin/check-access", headers={"Authorization": f"Bearer {tok}"})
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data["is_admin"] is True
+        assert data["is_admin"] == True
         assert data["email"] == email
     finally:
         db.user_sessions.delete_one({"session_token": tok})

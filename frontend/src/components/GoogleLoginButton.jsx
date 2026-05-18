@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import logger from "../utils/logger";
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
@@ -25,7 +26,7 @@ export default function GoogleLoginButton({ theme = "outline", size = "large", s
                 try {
                   await handleGoogleCredential(resp.credential);
                 } catch (e) {
-                  console.error("Google credential exchange failed:", e?.message || e);
+                  logger.error("Google credential exchange failed:", e?.message || e);
                 }
               }
             },
@@ -35,7 +36,7 @@ export default function GoogleLoginButton({ theme = "outline", size = "large", s
           }
           initializedRef.current = true;
         } catch (e) {
-          console.error("Google init failed:", e?.message || e);
+          logger.error("Google init failed:", e?.message || e);
         }
         return;
       }

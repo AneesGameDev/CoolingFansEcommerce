@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import logger from "../utils/logger";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const GUEST_ORDERS_KEY = "ohomart_guest_orders_v1";
@@ -21,7 +22,7 @@ export function AuthProvider({ children }) {
         localStorage.removeItem(GUEST_ORDERS_KEY);
       }
     } catch (e) {
-      console.error("link-guest failed:", e?.message || e);
+      logger.error("link-guest failed:", e?.message || e);
     }
   }, []);
 
@@ -50,7 +51,7 @@ export function AuthProvider({ children }) {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     } catch (e) {
-      console.error("logout failed:", e?.message || e);
+      logger.error("logout failed:", e?.message || e);
     }
     setUser(null);
   };

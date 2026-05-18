@@ -10,10 +10,16 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ohomart.online").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@ohomart.pk"
-ADMIN_PASSWORD = "Admin@123"
-TEST_SESSION = "test_session_fixed_abc123"
-TEST_USER_EMAIL = "test.reviewer@ohomart.pk"
+ADMIN_EMAIL = os.getenv("TEST_ADMIN_EMAIL", "ockmicrosoft.games@gmail.com")
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD")  # set in env — never hardcode
+TEST_SESSION = os.getenv("TEST_SESSION_TOKEN", "test_session_fixed_abc123")
+TEST_USER_EMAIL = os.getenv("TEST_USER_EMAIL", "test.reviewer@ohomart.pk")
+
+if not ADMIN_PASSWORD:
+    raise RuntimeError(
+        "Set TEST_ADMIN_PASSWORD environment variable before running tests.\n"
+        "  export TEST_ADMIN_PASSWORD='Admin@OHoMart2024'"
+    )
 
 
 @pytest.fixture(scope="module")

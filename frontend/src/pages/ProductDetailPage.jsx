@@ -219,7 +219,7 @@ export default function ProductDetailPage() {
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                 {product.images.map((img, i) => (
                   <button
-                    key={i}
+                    key={`img-${img.slice(-20)}-${i}`}
                     onClick={() => { setShowVideo(false); setSelectedImage(i); }}
                     className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${selectedImage === i && !showVideo ? "border-sky-500 shadow-md" : "border-slate-200"}`}
                     data-testid={`thumbnail-${i}`}
@@ -397,7 +397,7 @@ export default function ProductDetailPage() {
                 </h3>
                 <div className="grid grid-cols-1 gap-2">
                   {product.features.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
+                    <div key={`feature-${f.slice(0, 20)}-${i}`} className="flex items-center gap-2 text-sm text-slate-600">
                       <div className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />
                       {f}
                     </div>
@@ -543,7 +543,7 @@ export default function ProductDetailPage() {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">Add Photos (Optional, max 3)</label>
                     <div className="flex gap-2 flex-wrap">
                       {reviewForm.images.map((img, i) => (
-                        <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-sky-200">
+                        <div key={`review-img-${i}`} className="relative w-16 h-16 rounded-xl overflow-hidden border border-sky-200">
                           <img src={img} alt="" className="w-full h-full object-cover" />
                           <button
                             type="button"
