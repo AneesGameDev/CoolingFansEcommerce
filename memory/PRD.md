@@ -27,7 +27,15 @@ Must be independently deployable on ohomart.online with no manual DB setup.
 
 ## What's Been Implemented
 
-### 2026-05-18 — Initial Setup + Deployment Package
+### 2026-05-18 — WhatsApp Notifications + Auto-Reply
+- [x] Twilio WhatsApp integration installed (twilio==9.10.9)
+- [x] Order notifications: every new order sends detailed WhatsApp to ADMIN_WHATSAPP_NOTIFY
+- [x] Auto-reply webhook: `POST /api/whatsapp/webhook` — receives Twilio inbound, stores in DB, returns TwiML auto-reply
+- [x] `/api/admin/whatsapp-messages` endpoint for admin to view all inbound messages
+- [x] All credentials are env-var driven — zero hardcoding
+- [x] Webhook URL for Twilio: `https://ohomart.online/api/whatsapp/webhook`
+- [x] Complete credentials checklist added to README.md
+
 - [x] Fixed ALLOWED_ADMIN_EMAILS → ADMIN_EMAILS (bug: 3 admin accounts were never seeding)
 - [x] Set Google Client ID in both backend and frontend .env
 - [x] Admin Users tab UI added to AdminDashboard — list, add, toggle, delete, reset PW

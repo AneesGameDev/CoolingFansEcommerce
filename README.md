@@ -26,7 +26,76 @@ Live domain: **https://ohomart.online**
 
 ---
 
-## Quick Start (Docker — Recommended)
+## WhatsApp Notifications & Auto-Reply
+
+### How It Works
+1. **Order Notification:** Every new order automatically sends a detailed WhatsApp message to your admin phone
+2. **Auto-Reply:** When any customer messages your WhatsApp business number, they instantly get an auto-reply
+
+### Setup (Twilio)
+
+**Step 1: Create a Twilio account**
+- Go to https://www.twilio.com/try-twilio
+- Get your **Account SID** and **Auth Token** from the Console Dashboard
+
+**Step 2: Enable WhatsApp Sandbox** (for testing)
+- Console → Messaging → Try it out → Send a WhatsApp message
+- Note the sandbox number (e.g., +14155238886)
+- Send the join code from your WhatsApp to activate
+
+**Step 3: Configure backend/.env**
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+ADMIN_WHATSAPP_NOTIFY=whatsapp:+92xxxxxxxxxx   # Your phone to receive order alerts
+WHATSAPP_AUTO_REPLY=Hello! Thank you for contacting OHo Mart...
+```
+
+**Step 4: Configure Twilio Webhook** (for auto-reply)
+- Console → Messaging → Phone Numbers → Your WhatsApp number
+- Set **"A message comes in"** webhook to:
+  ```
+  https://ohomart.online/api/whatsapp/webhook
+  ```
+  Method: **HTTP POST**
+
+### For Production WhatsApp Business
+- Apply for a WhatsApp Business number via Twilio Console → WhatsApp Senders
+- Replace `TWILIO_WHATSAPP_FROM` with your approved business number
+- Update webhook URL in Twilio console
+
+---
+
+## Complete Credentials Checklist (Fill Before Deploying)
+
+### Required — App won't work without these
+| # | Env Variable | Where to Get | Example |
+|---|-------------|--------------|---------|
+| 1 | `MONGO_URL` | Your MongoDB / Atlas URI | `mongodb://localhost:27017` |
+| 2 | `JWT_SECRET` | Generate any random 32+ char string | `ohomart_abc123xyz456secret` |
+| 3 | `ADMIN_EMAILS` | Your email(s), comma-separated | `you@gmail.com,team@gmail.com` |
+| 4 | `DEFAULT_ADMIN_PASSWORD` | Choose strong password | `MyPassword@2024` |
+| 5 | `GOOGLE_CLIENT_ID` | Already configured for you | `845488070993-ak986...` |
+
+### Required for WhatsApp Features
+| # | Env Variable | Where to Get |
+|---|-------------|--------------|
+| 6 | `TWILIO_ACCOUNT_SID` | https://www.twilio.com/console (Dashboard) |
+| 7 | `TWILIO_AUTH_TOKEN` | https://www.twilio.com/console (Dashboard) |
+| 8 | `TWILIO_WHATSAPP_FROM` | Twilio Sandbox: `whatsapp:+14155238886` |
+| 9 | `ADMIN_WHATSAPP_NOTIFY` | Your personal WhatsApp: `whatsapp:+923xxxxxxxxx` |
+
+### Optional
+| # | Env Variable | Where to Get | Purpose |
+|---|-------------|--------------|---------|
+| 10 | `RESEND_API_KEY` | https://resend.com/api-keys | Password reset emails |
+| 11 | `SENDER_EMAIL` | Your verified Resend domain | Email sender address |
+| 12 | `COOKIE_DOMAIN` | Your domain name | `ohomart.online` |
+| 13 | `WHATSAPP_AUTO_REPLY` | Custom text | Auto-reply message to customers |
+
+---
+
 
 ### Prerequisites
 - Docker + Docker Compose installed on your VPS

@@ -21,6 +21,14 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import uuid
 
+# ---- Twilio (optional — only active when credentials are set) ----
+try:
+    from twilio.rest import Client as TwilioClient
+    from twilio.twiml.messaging_response import MessagingResponse
+    _twilio_available = True
+except ImportError:
+    _twilio_available = False
+
 ROOT_DIR = Path(__file__).parent
 
 mongo_url = os.environ['MONGO_URL']
@@ -41,6 +49,23 @@ DEFAULT_ADMIN_PASSWORD = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'change-me')
 CORS_ORIGINS = [
     o.strip() for o in os.environ.get('CORS_ORIGINS', 'https://ohomart.online,https://www.ohomart.online').split(',') if o.strip()
 ]
+
+# ---- Twilio config ----
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '')
+ADMIN_WHATSAPP_NOTIFY = os.environ.get('ADMIN_WHATSAPP_NOTIFY', '')
+WHATSAPP_AUTO_REPLY = os.environ.get(
+    'WHATSAPP_AUTO_REPLY',
+    'Hello! Thank you for contacting OHo Mart. We received your message and will reply shortly. Visit https://ohomart.online to browse our fans. Our team is available 9am-9pm PKT.'
+)
+
+_twilio_client = None
+if _twilio_available and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+    try:
+        _twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    except Exception as _e:
+        logging.warning(f"Twilio client init failed: {_e}")
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -738,6 +763,54 @@ async def _send_email_async(to_email: str, subject: str, html: str):
         return None
 
 
+# ---- WhatsApp Helpers ----
+
+def _send_whatsapp(to: str, body: str) -> Optional[str]:
+    """Send a WhatsApp message via Twilio. Returns message SID or None."""
+    if not _twilio_client:
+        logger.warning("Twilio not configured — skipping WhatsApp send")
+        return None
+    if not to or not TWILIO_WHATSAPP_FROM:
+        return None
+    # Ensure whatsapp: prefix
+    to_wa = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+    from_wa = TWILIO_WHATSAPP_FROM if TWILIO_WHATSAPP_FROM.startswith("whatsapp:") else f"whatsapp:{TWILIO_WHATSAPP_FROM}"
+    try:
+        msg = _twilio_client.messages.create(body=body, from_=from_wa, to=to_wa)
+        logger.info(f"WhatsApp sent to {to_wa}: SID={msg.sid}")
+        return msg.sid
+    except Exception as e:
+        logger.error(f"WhatsApp send failed: {e}")
+        return None
+
+
+async def _notify_admin_new_order(order: dict):
+    """Build a rich order notification and send to admin WhatsApp."""
+    if not ADMIN_WHATSAPP_NOTIFY:
+        return
+    items_text = ""
+    for it in (order.get("items") or []):
+        color_info = f" [{it.get('selected_color')}]" if it.get("selected_color") else ""
+        size_info = f" [{it.get('selected_size')}]" if it.get("selected_size") else ""
+        items_text += f"  • {it.get('product_name','?')} x{it.get('quantity',1)}{color_info}{size_info} — Rs.{it.get('line_total',0):,.0f}\n"
+
+    msg = (
+        f"*NEW ORDER — OHo Mart*\n"
+        f"Order: {order.get('order_number','')}\n"
+        f"Customer: {order.get('customer_name','')}\n"
+        f"Phone: {order.get('phone','')}\n"
+        f"City: {order.get('city','')}{', '+order['province'] if order.get('province') else ''}\n"
+        f"Address: {order.get('address','')}\n\n"
+        f"Items:\n{items_text}"
+        f"*Total: Rs.{order.get('total_price',0):,.0f}*\n"
+        f"Payment: Cash on Delivery\n"
+        f"Time: {datetime.now(timezone.utc).strftime('%d %b %Y, %I:%M %p UTC')}"
+    )
+    if order.get("notes"):
+        msg += f"\nNotes: {order['notes']}"
+    await asyncio.to_thread(_send_whatsapp, ADMIN_WHATSAPP_NOTIFY, msg)
+
+
 @api_router.post("/admin/forgot-password")
 async def admin_forgot_password(data: AdminForgotPassword):
     """Send a 6-digit reset code to the admin's email. Always returns success to prevent enumeration."""
@@ -897,6 +970,8 @@ async def create_order(data: OrderCreate, user=Depends(get_current_user)):
                 {"_id": ObjectId(item.product_id)},
                 {"$inc": {"total_sold": item.quantity}}
             )
+    # Send WhatsApp notification to admin (non-blocking)
+    asyncio.create_task(_notify_admin_new_order(doc))
     return doc
 
 
@@ -1096,6 +1171,49 @@ async def get_admin_stats(current_admin=Depends(get_admin_user)):
         "total_reviews": total_reviews,
         "total_revenue": total_revenue
     }
+
+
+# ---- WhatsApp Webhook (inbound messages → auto-reply) ----
+
+@api_router.post("/whatsapp/webhook")
+async def whatsapp_webhook(request: Request):
+    """
+    Twilio webhook for incoming WhatsApp messages.
+    Configure in Twilio Console:
+      Sandbox/Phone → 'A message comes in' → Webhook:
+      https://ohomart.online/api/whatsapp/webhook  (HTTP POST)
+    """
+    try:
+        form = await request.form()
+        sender = form.get("From", "")
+        body_text = form.get("Body", "")
+        logger.info(f"Inbound WhatsApp from {sender}: {body_text[:80]}")
+        # Store for admin visibility
+        await db.whatsapp_messages.insert_one({
+            "direction": "inbound",
+            "from": sender,
+            "body": body_text,
+            "twilio_sid": form.get("MessageSid", ""),
+            "received_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error(f"WhatsApp webhook DB error: {e}")
+
+    reply_text = WHATSAPP_AUTO_REPLY
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Response>'
+        f'<Message>{reply_text}</Message>'
+        '</Response>'
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+@api_router.get("/admin/whatsapp-messages")
+async def get_whatsapp_messages(current_admin=Depends(get_admin_user)):
+    """Admin: view all inbound WhatsApp messages."""
+    msgs = await db.whatsapp_messages.find({"direction": "inbound"}).sort("received_at", -1).to_list(500)
+    return [doc_to_dict(m) for m in msgs]
 
 
 app.include_router(api_router)
