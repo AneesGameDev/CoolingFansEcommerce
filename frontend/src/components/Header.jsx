@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Wind, Menu, X, ShieldCheck, ShoppingBag, User, LogOut, Package, ChevronDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
+import { useSiteSettings } from "../contexts/SiteSettingsContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "./ui/dropdown-menu";
 import GoogleLoginButton from "./GoogleLoginButton";
 
@@ -11,6 +12,8 @@ export default function Header() {
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
   const { totalQty, setOpen: openCart } = useCart();
+  const { whatsapp_number } = useSiteSettings();
+  const waPhone = whatsapp_number || "923000000000";
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-sky-100 shadow-sm" data-testid="site-header">
@@ -33,7 +36,7 @@ export default function Header() {
             <Link to="/#products" className="text-slate-600 hover:text-sky-500 font-medium transition-colors" data-testid="nav-products">Products</Link>
             <Link to="/track" className="text-slate-600 hover:text-sky-500 font-medium transition-colors" data-testid="nav-track">Track Order</Link>
             <a
-              href="https://wa.me/923000000000"
+              href={`https://wa.me/${waPhone}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-slate-600 hover:text-green-500 font-medium transition-colors"
@@ -63,7 +66,7 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-1.5 bg-white border border-sky-200 hover:bg-sky-50 px-2 py-1.5 rounded-full transition-all" data-testid="user-menu-btn">
                     {user.picture ? (
-                      <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+                      <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                     ) : (
                       <div className="w-7 h-7 bg-sky-100 rounded-full flex items-center justify-center">
                         <User className="w-4 h-4 text-sky-600" />
@@ -127,7 +130,7 @@ export default function Header() {
               <Link to="/my-orders" className="block px-4 py-2 text-slate-700 hover:text-sky-500 font-medium" onClick={() => setMenuOpen(false)}>My Orders</Link>
             )}
             <a
-              href="https://wa.me/923000000000"
+              href={`https://wa.me/${waPhone}`}
               target="_blank"
               rel="noopener noreferrer"
               className="block px-4 py-2 text-green-600 font-medium"

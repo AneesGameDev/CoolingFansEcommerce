@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request, Response, Cookie
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, Request, Response, Cookie, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -266,6 +266,7 @@ class ReviewCreate(BaseModel):
     rating: int
     comment: str
     images: List[str] = []   # base64 data URIs (up to 3)
+    reviewer_avatar: Optional[str] = ""  # Google profile picture URL
 
 
 class AdminReviewCreate(BaseModel):
@@ -564,7 +565,7 @@ async def startup_event():
             "key": "main",
             "brand": "OHo Mart",
             "currency": "PKR",
-            "whatsapp": WHATSAPP_NUMBER,
+            "whatsapp_number": WHATSAPP_NUMBER,
             **DEFAULT_SITE_SETTINGS,
         })
         logger.info("Seeded default site settings")
@@ -1052,6 +1053,7 @@ async def create_review(data: ReviewCreate, user=Depends(get_required_user)):
     doc = {
         "product_id": data.product_id,
         "reviewer_name": user.get("name") or user.get("email", "User"),
+        "reviewer_avatar": data.reviewer_avatar or user.get("picture", ""),
         "user_email": user["email"],
         "rating": data.rating,
         "comment": data.comment,
@@ -1152,6 +1154,62 @@ async def update_testimonials(data: TestimonialsBulkUpdate, current_admin=Depend
         upsert=True,
     )
     return {"featured_testimonials": items}
+
+
+# ---- Media Upload (GridFS — images & videos stored in MongoDB) ----
+
+@api_router.post("/admin/upload-media")
+async def upload_media(file: UploadFile = File(...), current_admin=Depends(get_admin_user)):
+    """
+    Upload an image or video file. Stored in MongoDB GridFS.
+    Returns a URL: /api/media/{file_id} — serve it via GET /api/media/{file_id}.
+    Max file size: 50 MB for videos, 10 MB for images.
+    """
+    from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+    content_type = file.content_type or "application/octet-stream"
+    is_video = content_type.startswith("video/")
+    max_bytes = 50 * 1024 * 1024 if is_video else 10 * 1024 * 1024
+
+    data = await file.read()
+    if len(data) > max_bytes:
+        limit = "50 MB" if is_video else "10 MB"
+        raise HTTPException(status_code=413, detail=f"File too large. Max {limit}.")
+
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name="media")
+    file_id = await bucket.upload_from_stream(
+        file.filename or "upload",
+        data,
+        metadata={"content_type": content_type, "original_name": file.filename},
+    )
+    return {
+        "url": f"/api/media/{str(file_id)}",
+        "file_id": str(file_id),
+        "filename": file.filename,
+        "content_type": content_type,
+        "size_bytes": len(data),
+    }
+
+
+@api_router.get("/media/{file_id}")
+async def serve_media(file_id: str):
+    """Serve a file uploaded via /api/admin/upload-media from MongoDB GridFS."""
+    from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+    if not ObjectId.is_valid(file_id):
+        raise HTTPException(status_code=400, detail="Invalid file ID")
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name="media")
+    try:
+        stream = await bucket.open_download_stream(ObjectId(file_id))
+        data = await stream.read()
+        content_type = "application/octet-stream"
+        if stream.metadata:
+            content_type = stream.metadata.get("content_type", content_type)
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=31536000", "Content-Length": str(len(data))},
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Media not found")
 
 
 # ---- Health Check ----

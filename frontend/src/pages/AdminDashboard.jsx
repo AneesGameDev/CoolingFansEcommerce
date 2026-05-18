@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import {
   LayoutDashboard, Package, ShoppingCart, Star, LogOut, Wind,
   Plus, Edit2, Trash2, Check, X, ChevronDown, Eye, EyeOff, TrendingUp,
-  Users, DollarSign, RefreshCw, AlertCircle, CheckCircle, Truck, XCircle, Settings, MessageSquare
+  Users, DollarSign, RefreshCw, AlertCircle, CheckCircle, Truck, XCircle, Settings, MessageSquare,
+  Upload, Link2, ImagePlus, Film
 } from "lucide-react";
 import StarRating from "../components/StarRating";
 import { useSiteSettings } from "../contexts/SiteSettingsContext";
@@ -28,7 +29,7 @@ const STATUS_ICONS = { pending: AlertCircle, confirmed: CheckCircle, shipped: Tr
 
 const EMPTY_PRODUCT = {
   name: "", description: "", price: "", discounted_price: "", category: "neck-fan",
-  images: "", video_url: "", colors: "", color_variants: [], sizes: "", features: "", battery_life: "", stock: 100, is_active: true
+  images: [], video_url: "", colors: "", color_variants: [], sizes: "", features: "", battery_life: "", stock: 100, is_active: true
 };
 
 const EMPTY_REVIEW = {
@@ -36,6 +37,113 @@ const EMPTY_REVIEW = {
 };
 
 const MAX_REVIEW_IMG_BYTES = 1.5 * 1024 * 1024;
+
+// ---- MediaUploader: dual-input component (Browse from PC + HTTPS URL) ----
+function MediaUploader({ label, accept, multiple, value, onChange, testId, hint }) {
+  const fileInputRef = useRef(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [tab, setTab] = useState("browse"); // "browse" | "url"
+
+  // value is array of URL strings
+  const items = Array.isArray(value) ? value : (value ? value.split("\n").map(s => s.trim()).filter(Boolean) : []);
+
+  const handleFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const newUrls = [];
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await axios.post(`${API}/admin/upload-media`, fd, {
+          headers: { ...getConfig().headers, "Content-Type": "multipart/form-data" }
+        });
+        newUrls.push(res.data.url);
+      } catch (e) {
+        alert(`Upload failed for ${file.name}: ${e.response?.data?.detail || e.message}`);
+      }
+    }
+    setUploading(false);
+    if (newUrls.length > 0) onChange([...items, ...newUrls]);
+  };
+
+  const addUrl = () => {
+    const u = urlInput.trim();
+    if (!u) return;
+    if (!u.startsWith("http")) { alert("Please enter a valid HTTPS URL"); return; }
+    onChange([...items, u]);
+    setUrlInput("");
+  };
+
+  const removeItem = (idx) => onChange(items.filter((_, i) => i !== idx));
+
+  const isVideo = accept && accept.includes("video");
+
+  return (
+    <div data-testid={testId}>
+      <label className="block text-sm font-semibold text-slate-300 mb-2">{label}</label>
+      <div className="flex gap-2 mb-3">
+        <button type="button" onClick={() => setTab("browse")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${tab === "browse" ? "bg-sky-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+          <Upload className="w-3.5 h-3.5" /> Browse File
+        </button>
+        <button type="button" onClick={() => setTab("url")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${tab === "url" ? "bg-sky-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+          <Link2 className="w-3.5 h-3.5" /> Paste URL
+        </button>
+      </div>
+
+      {tab === "browse" && (
+        <div>
+          <input ref={fileInputRef} type="file" accept={accept} multiple={multiple} className="hidden"
+            onChange={e => handleFiles(e.target.files)} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="w-full border-2 border-dashed border-slate-600 hover:border-sky-500 rounded-xl p-4 flex flex-col items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+            data-testid={`${testId}-browse-btn`}>
+            {isVideo ? <Film className="w-6 h-6 text-slate-400" /> : <ImagePlus className="w-6 h-6 text-slate-400" />}
+            <span className="text-slate-400 text-xs">{uploading ? "Uploading..." : `Click to select ${isVideo ? "video" : "image"} from PC / Mobile`}</span>
+            {hint && <span className="text-slate-500 text-xs">{hint}</span>}
+          </button>
+        </div>
+      )}
+
+      {tab === "url" && (
+        <div className="flex gap-2">
+          <input type="url" value={urlInput} onChange={e => setUrlInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addUrl())}
+            placeholder="https://example.com/image.jpg"
+            className="flex-1 bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            data-testid={`${testId}-url-input`} />
+          <button type="button" onClick={addUrl}
+            className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold">
+            Add
+          </button>
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {items.map((url, i) => (
+            <div key={i} className="relative group rounded-xl overflow-hidden bg-slate-900 border border-slate-700"
+              data-testid={`${testId}-item-${i}`}>
+              {isVideo
+                ? <div className="aspect-video flex flex-col items-center justify-center gap-1 p-2"><Film className="w-6 h-6 text-slate-400" /><span className="text-xs text-slate-400 truncate w-full text-center">{url.split("/").pop()}</span></div>
+                : <img src={url.startsWith("/api/media/") ? `${process.env.REACT_APP_BACKEND_URL}${url}` : url} alt={`img-${i}`}
+                    className="aspect-square object-cover w-full"
+                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=100"; }} />
+              }
+              <button type="button" onClick={() => removeItem(i)}
+                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SITE_SETTINGS_GROUPS = [
   { title: "Brand", keys: ["brand_name", "brand_tagline", "whatsapp_number"] },
@@ -136,7 +244,7 @@ export default function AdminDashboard() {
       setEditingProduct(product);
       setProductForm({
         ...product,
-        images: product.images?.join("\n") || "",
+        images: product.images || [],
         colors: product.colors?.join(", ") || "",
         color_variants: product.color_variants || [],
         sizes: product.sizes?.join(", ") || "",
@@ -170,7 +278,9 @@ export default function AdminDashboard() {
     e.preventDefault();
     setSavingProduct(true);
     try {
-      const imageList = productForm.images.split("\n").map(s => s.trim()).filter(Boolean);
+      const imageList = Array.isArray(productForm.images)
+        ? productForm.images.filter(Boolean)
+        : productForm.images.split("\n").map(s => s.trim()).filter(Boolean);
       const variants = (productForm.color_variants || []).filter(cv => cv.name?.trim());
       // Auto-merge variant image_urls into images list (so they're available as main images)
       for (const cv of variants) {
@@ -1146,18 +1256,26 @@ export default function AdminDashboard() {
                     className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-300 mb-1">Image URLs (one per line)</label>
-                  <textarea value={productForm.images} onChange={e => setProductForm(p => ({ ...p, images: e.target.value }))}
-                    rows={3} placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
-                    className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
-                    data-testid="product-images-input" />
+                  <MediaUploader
+                    label="Product Images"
+                    accept="image/*"
+                    multiple={true}
+                    value={productForm.images}
+                    onChange={imgs => setProductForm(p => ({ ...p, images: imgs }))}
+                    testId="product-images-uploader"
+                    hint="PNG, JPG, WEBP — max 10 MB each"
+                  />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-300 mb-1">Video URL (YouTube/direct)</label>
-                  <input value={productForm.video_url} onChange={e => setProductForm(p => ({ ...p, video_url: e.target.value }))}
-                    placeholder="https://youtube.com/embed/..."
-                    className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    data-testid="product-video-input" />
+                  <MediaUploader
+                    label="Product Video (optional)"
+                    accept="video/*"
+                    multiple={false}
+                    value={productForm.video_url ? [productForm.video_url] : []}
+                    onChange={urls => setProductForm(p => ({ ...p, video_url: urls[urls.length - 1] || "" }))}
+                    testId="product-video-uploader"
+                    hint="MP4, MOV — max 50 MB. Or paste a YouTube embed URL."
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-slate-300 mb-1">Colors (comma separated)</label>
@@ -1183,9 +1301,22 @@ export default function AdminDashboard() {
                           <input value={cv.hex || ""} onChange={e => updateColorVariant(i, "hex", e.target.value)}
                             placeholder="#FBA4C0" className="col-span-2 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs font-mono" />
                           <div className="col-span-1 w-6 h-6 rounded-full border border-slate-600" style={{ backgroundColor: cv.hex || "#cbd5e1" }} />
-                          <input value={cv.image_url || ""} onChange={e => updateColorVariant(i, "image_url", e.target.value)}
-                            placeholder="https://image-url-for-this-color.jpg"
-                            className="col-span-5 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs" />
+                          <div className="col-span-5 flex gap-1">
+                            <input value={cv.image_url || ""} onChange={e => updateColorVariant(i, "image_url", e.target.value)}
+                              placeholder="https://... or upload below"
+                              className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1.5 text-xs" />
+                            <label className="cursor-pointer bg-sky-600/30 hover:bg-sky-600 text-sky-300 hover:text-white rounded-lg p-1.5 flex items-center" title="Browse image">
+                              <ImagePlus className="w-3.5 h-3.5" />
+                              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                const file = e.target.files?.[0]; if (!file) return;
+                                const fd = new FormData(); fd.append("file", file);
+                                try {
+                                  const res = await axios.post(`${API}/admin/upload-media`, fd, { headers: { ...getConfig().headers, "Content-Type": "multipart/form-data" } });
+                                  updateColorVariant(i, "image_url", res.data.url);
+                                } catch (err) { alert("Upload failed: " + (err.response?.data?.detail || err.message)); }
+                              }} />
+                            </label>
+                          </div>
                           <button type="button" onClick={() => removeColorVariant(i)}
                             className="col-span-1 bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white rounded-lg p-1.5 flex items-center justify-center"
                             aria-label="Remove">

@@ -125,7 +125,7 @@ export default function ProductDetailPage() {
     try {
       const res = await axios.post(
         `${API}/reviews`,
-        { product_id: id, rating: reviewForm.rating, comment: reviewForm.comment, images: reviewForm.images },
+        { product_id: id, rating: reviewForm.rating, comment: reviewForm.comment, images: reviewForm.images, reviewer_avatar: user.picture || "" },
         { withCredentials: true }
       );
       setReviews((prev) => [res.data, ...prev]);
@@ -456,13 +456,29 @@ export default function ProductDetailPage() {
             {reviews.map((review) => (
               <div key={review.id} className="bg-white rounded-2xl p-5 border border-sky-100" data-testid={`review-${review.id}`}>
                 <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-bold text-slate-900">{review.reviewer_name}</p>
-                    {review.verified_purchase && (
-                      <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> Verified Purchase
-                      </span>
+                  <div className="flex items-center gap-3">
+                    {review.reviewer_avatar ? (
+                      <img
+                        src={review.reviewer_avatar}
+                        alt={review.reviewer_name}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        onError={(e) => { e.target.style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0 text-sky-600 font-bold text-sm">
+                        {(review.reviewer_name || "U").charAt(0).toUpperCase()}
+                      </div>
                     )}
+                    <div>
+                      <p className="font-bold text-slate-900">{review.reviewer_name}</p>
+                      {review.verified_purchase && (
+                        <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Verified Purchase
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <StarRating rating={review.rating} size="sm" />
                 </div>
@@ -501,7 +517,7 @@ export default function ProductDetailPage() {
                 )}
                 <form onSubmit={submitReview} className="space-y-4">
                   <div className="flex items-center gap-3 bg-sky-50 rounded-xl p-3 border border-sky-100">
-                    {user.picture && <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full" />}
+                    {user.picture && <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full" referrerPolicy="no-referrer" crossOrigin="anonymous" onError={(e) => { e.target.style.display = "none"; }} />}
                     <div>
                       <p className="text-sm font-semibold text-slate-900">Posting as {user.name || user.email}</p>
                       <p className="text-xs text-slate-500">Your name & email are linked to this review</p>
