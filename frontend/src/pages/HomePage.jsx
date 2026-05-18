@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { Wind, Shield, Star, ChevronRight, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle, Sparkles, Heart, ShieldCheck, Award, Quote, Flame } from "lucide-react";
+import { Wind, Shield, Star, ChevronRight, ChevronLeft, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle, Sparkles, Heart, ShieldCheck, Award, Quote, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import ProductCard from "../components/ProductCard";
@@ -8,6 +8,7 @@ import CoolingFX from "../components/CoolingFX";
 import { useSiteSettings } from "../contexts/SiteSettingsContext";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const PER_PAGE = 12;
 
 const WHY_BUY = [
   { icon: Plane, title: "Directly Imported", desc: "Premium-grade fans straight from top factories. No local copies, no shortcuts — only the real thing.", color: "from-sky-400 to-blue-500" },
@@ -22,13 +23,36 @@ export default function HomePage() {
   const settings = useSiteSettings();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
 
-  useEffect(() => {
-    axios.get(`${API}/products`)
-      .then((r) => setProducts(r.data))
+  const fetchProducts = useCallback((p = 1) => {
+    setLoading(true);
+    axios.get(`${API}/products?page=${p}&per_page=${PER_PAGE}`)
+      .then((r) => {
+        // Support both paginated {products, total, pages} and legacy array response
+        if (Array.isArray(r.data)) {
+          setProducts(r.data);
+          setTotalPages(1);
+          setTotalProducts(r.data.length);
+        } else {
+          setProducts(r.data.products || []);
+          setTotalPages(r.data.pages || 1);
+          setTotalProducts(r.data.total || 0);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { fetchProducts(1); }, [fetchProducts]);
+
+  const goToPage = (p) => {
+    setPage(p);
+    fetchProducts(p);
+    document.getElementById("products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const stats = [
     { value: settings.stats_customers_value, label: settings.stats_customers_label, icon: Heart, color: "text-rose-500" },
@@ -181,7 +205,7 @@ export default function HomePage() {
 
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" data-testid="products-loading">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(PER_PAGE)].map((_, i) => (
               <div key={i} className="bg-white rounded-2xl border border-sky-100 overflow-hidden animate-pulse">
                 <div className="aspect-square bg-slate-100" />
                 <div className="p-4 space-y-2">
@@ -193,11 +217,55 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" data-testid="products-grid">
-            {products.map((product, i) => (
-              <ProductCard key={product.id} product={product} index={i} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" data-testid="products-grid">
+              {products.map((product, i) => (
+                <ProductCard key={product.id} product={product} index={i} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-10" data-testid="products-pagination">
+                <button
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1}
+                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white border border-sky-200 text-sky-700 font-semibold text-sm hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  data-testid="pagination-prev"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Prev
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => goToPage(p)}
+                      className={`w-9 h-9 rounded-xl text-sm font-bold transition-all ${p === page ? "bg-sky-500 text-white shadow-md shadow-sky-200" : "bg-white border border-sky-200 text-sky-700 hover:bg-sky-50"}`}
+                      data-testid={`pagination-page-${p}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages}
+                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white border border-sky-200 text-sky-700 font-semibold text-sm hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  data-testid="pagination-next"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {totalProducts > 0 && (
+              <p className="text-center text-slate-400 text-sm mt-3" data-testid="products-count">
+                Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, totalProducts)} of {totalProducts} products
+              </p>
+            )}
+          </>
         )}
       </section>
 

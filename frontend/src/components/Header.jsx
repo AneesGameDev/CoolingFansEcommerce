@@ -55,8 +55,12 @@ export default function Header() {
             >
               <ShoppingBag className="w-5 h-5" />
               {totalQty > 0 && (
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1" data-testid="cart-badge">
-                  {totalQty}
+                <span
+                  className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1 shadow-md shadow-red-300 ring-2 ring-white animate-bounce"
+                  data-testid="cart-badge"
+                  style={{ animationDuration: "0.8s", animationIterationCount: 3 }}
+                >
+                  {totalQty > 99 ? "99+" : totalQty}
                 </span>
               )}
             </button>

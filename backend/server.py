@@ -20,6 +20,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import uuid
+import math
 
 # ---- Twilio (optional — only active when credentials are set) ----
 try:
@@ -886,14 +887,37 @@ async def admin_reset_password(data: AdminResetPassword):
 # ---- Products ----
 
 @api_router.get("/products")
-async def get_products():
-    products = await db.products.find({"is_active": True}).to_list(100)
-    return [doc_to_dict(p) for p in products]
+async def get_products(page: int = 1, per_page: int = 12, category: Optional[str] = None):
+    """
+    Public product listing with pagination.
+    Returns: { products, total, page, per_page, pages }
+    Use page=0 or per_page=0 to get ALL products (admin-style, not recommended for large catalogs).
+    """
+    query: dict = {"is_active": True}
+    if category:
+        query["category"] = category
+    total = await db.products.count_documents(query)
+    # per_page=0 means fetch all (backward compat)
+    if per_page <= 0:
+        docs = await db.products.find(query).sort([("total_sold", -1), ("created_at", -1)]).to_list(1000)
+        return {
+            "products": [doc_to_dict(p) for p in docs],
+            "total": total, "page": 1, "per_page": total, "pages": 1,
+        }
+    skip = (max(page, 1) - 1) * per_page
+    docs = await db.products.find(query).sort([("total_sold", -1), ("created_at", -1)]).skip(skip).limit(per_page).to_list(per_page)
+    return {
+        "products": [doc_to_dict(p) for p in docs],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": math.ceil(total / per_page) if per_page > 0 else 1,
+    }
 
 
 @api_router.get("/admin/products")
 async def get_all_products(current_admin=Depends(get_admin_user)):
-    products = await db.products.find({}).to_list(100)
+    products = await db.products.find({}).sort("created_at", -1).to_list(1000)
     return [doc_to_dict(p) for p in products]
 
 

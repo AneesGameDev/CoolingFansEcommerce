@@ -52,8 +52,10 @@ function MediaUploader({ label, accept, multiple, value, onChange, testId, hint 
     if (!files || files.length === 0) return;
     setUploading(true);
     const newUrls = [];
-    for (const file of Array.from(files)) {
+    for (const rawFile of Array.from(files)) {
       try {
+        // Compress images before sending to MongoDB (keeps storage small on free tier)
+        const file = await compressImage(rawFile);
         const fd = new FormData();
         fd.append("file", file);
         const res = await axios.post(`${API}/admin/upload-media`, fd, {
@@ -61,7 +63,7 @@ function MediaUploader({ label, accept, multiple, value, onChange, testId, hint 
         });
         newUrls.push(res.data.url);
       } catch (e) {
-        alert(`Upload failed for ${file.name}: ${e.response?.data?.detail || e.message}`);
+        alert(`Upload failed for ${rawFile.name}: ${e.response?.data?.detail || e.message}`);
       }
     }
     setUploading(false);
@@ -129,7 +131,8 @@ function MediaUploader({ label, accept, multiple, value, onChange, testId, hint 
               data-testid={`${testId}-item-${i}`}>
               {isVideo
                 ? <div className="aspect-video flex flex-col items-center justify-center gap-1 p-2"><Film className="w-6 h-6 text-slate-400" /><span className="text-xs text-slate-400 truncate w-full text-center">{url.split("/").pop()}</span></div>
-                : <img src={url.startsWith("/api/media/") ? `${process.env.REACT_APP_BACKEND_URL}${url}` : url} alt={`img-${i}`}
+                : <img src={url.startsWith("/api/media/") ? `${process.env.REACT_APP_BACKEND_URL}${url}` : url}
+                    alt={`img-${i}`}
                     className="aspect-square object-cover w-full"
                     onError={e => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=100"; }} />
               }
@@ -143,6 +146,32 @@ function MediaUploader({ label, accept, multiple, value, onChange, testId, hint 
       )}
     </div>
   );
+}
+
+// Compress image client-side before upload — reduces MongoDB storage significantly
+// A 5 MB photo becomes ~150-300 KB. Max 1200px wide, 80% JPEG quality.
+async function compressImage(file) {
+  if (!file.type.startsWith("image/")) return file; // skip videos / non-images
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const MAX = 1200;
+      const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" })),
+        "image/jpeg",
+        0.82
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file); };
+    img.src = objUrl;
+  });
 }
 
 const SITE_SETTINGS_GROUPS = [

@@ -27,6 +27,14 @@ Must be independently deployable on ohomart.online with no manual DB setup.
 
 ## What's Been Implemented
 
+### 2026-05-18 — Media Upload Fix + Pagination + Cart/Sold UI
+- [x] MediaUploader: client-side image compression via Canvas API (5MB → ~200KB, MongoDB free tier safe)
+- [x] ProductCard: larger cart + button, rotating icon, amber styling
+- [x] ProductCard: sold badge always shows for total_sold>0, gradient overlay with Flame + Hot tags
+- [x] Header cart badge: red, bounce animation, ring-2, 99+ cap
+- [x] Backend GET /api/products: pagination added (page, per_page, returns {products, total, pages})
+- [x] Frontend HomePage: paginated grid, Prev/Next + page numbers, products count indicator
+
 ### 2026-05-18 — WhatsApp Notifications + Auto-Reply
 - [x] Twilio WhatsApp integration installed (twilio==9.10.9)
 - [x] Order notifications: every new order sends detailed WhatsApp to ADMIN_WHATSAPP_NOTIFY
