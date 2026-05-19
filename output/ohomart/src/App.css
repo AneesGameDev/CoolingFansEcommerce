@@ -1,0 +1,238 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #F0F9FF;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes flake-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: var(--flake-opacity, 0.6); }
+  90% { opacity: var(--flake-opacity, 0.6); }
+  100% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes wind-flow {
+  0% { transform: translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(120vw); opacity: 0; }
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(8deg); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(-50%, 0) scale(1.1); opacity: 0.8; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes slide-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-slide-left { animation: slide-left linear infinite; }
+
+.animate-flake { animation: flake-fall linear infinite; }
+.animate-wind { animation: wind-flow linear infinite; }
+.animate-float { animation: float-soft ease-in-out infinite; }
+.animate-pulse-slow { animation: pulse-slow 6s ease-in-out infinite; }
+.animate-ticker { animation: ticker 30s linear infinite; }
+
+.shimmer-text {
+  background: linear-gradient(90deg, #FDE68A 0%, #FBBF24 25%, #FFFFFF 50%, #FBBF24 75%, #FDE68A 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+.frost-glass {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.elite-border {
+  position: relative;
+}
+.elite-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #38BDF8, #0EA5E9, #FBBF24);
+  z-index: -1;
+}
+
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.hero-gradient {
+  background: linear-gradient(135deg, #0EA5E9 0%, #38BDF8 40%, #BAE6FD 100%);
+}
+
+.sale-gradient {
+  background: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+}
+
+.product-card-hover {
+  transition: all 0.3s ease;
+}
+
+.product-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(14, 165, 233, 0.15);
+}
+
+.btn-primary {
+  background: #0EA5E9;
+  color: white;
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary:hover {
+  background: #0284C7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.whatsapp-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+  background: #25D366;
+  color: white;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+}
+
+.whatsapp-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 25px rgba(37, 211, 102, 0.6);
+}
+
+.whatsapp-btn::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: #25D366;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+.color-swatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.color-swatch:hover, .color-swatch.selected {
+  border-color: #0EA5E9;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.3);
+}
+
+.star-filled {
+  color: #F59E0B;
+}
+
+.star-empty {
+  color: #E2E8F0;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
