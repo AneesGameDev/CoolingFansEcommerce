@@ -1,11 +1,15 @@
 {
   "short_name": "OHo Mart",
-  "name": "OHo Mart | Pakistan's #1 Imported Fan Store",
+  "name": "OHo Mart | Pakistan's Imported Fan Store",
+  "description": "Imported neck fans, baby fans and travel fans with cash on delivery across Pakistan.",
   "icons": [
     { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#0EA5E9",
-  "background_color": "#F0F9FF"
+  "background_color": "#F0F9FF",
+  "lang": "en-PK"
 }

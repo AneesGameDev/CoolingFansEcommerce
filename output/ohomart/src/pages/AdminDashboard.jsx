@@ -5,12 +5,14 @@ import {
   LayoutDashboard, Package, ShoppingCart, Star, LogOut, Wind,
   Plus, Edit2, Trash2, Check, X, ChevronDown, Eye, EyeOff, TrendingUp,
   Users, DollarSign, RefreshCw, AlertCircle, CheckCircle, Truck, XCircle, Settings, MessageSquare,
-  ImagePlus
+  ImagePlus, Search as SearchIcon
 } from "lucide-react";
 import StarRating from "../components/StarRating";
 import { useSiteSettings } from "../contexts/SiteSettingsContext";
 import MediaUploader from "../components/MediaUploader";
 import logger from "../utils/logger";
+import Seo from "../seo/Seo";
+import { resolveProductSeo, slugify } from "../seo/seoDefaults";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,10 +31,33 @@ const STATUS_COLORS = {
 };
 const STATUS_ICONS = { pending: AlertCircle, confirmed: CheckCircle, shipped: Truck, delivered: Check, cancelled: XCircle };
 
+const EMPTY_SEO = {
+  title: "",
+  description: "",
+  slug: "",
+  focus_keyword: "",
+  og_image: "",
+  brand_name: "OHo Mart",
+  robots: "index, follow",
+};
+
 const EMPTY_PRODUCT = {
   name: "", description: "", price: "", discounted_price: "", category: "neck-fan",
-  images: [], video_url: "", colors: "", color_variants: [], sizes: "", features: "", battery_life: "", stock: 100, is_active: true
+  images: [], video_url: "", colors: "", color_variants: [], sizes: "", features: "", battery_life: "", stock: 100, is_active: true,
+  seo: { ...EMPTY_SEO },
 };
+
+// Counts how many SEO best practice items are missing for a given product.
+// Returns { score: 0 to N, missing: [] }
+function seoHealth(product) {
+  const seo = product.seo || {};
+  const missing = [];
+  if (!seo.title || seo.title.trim().length < 20) missing.push("SEO title");
+  if (!seo.description || seo.description.trim().length < 80) missing.push("Meta description");
+  if (!product.description || product.description.trim().split(/\s+/).length < 100) missing.push("Long description (100+ words)");
+  if (!product.images || product.images.length === 0) missing.push("Product image");
+  return { missing, score: 4 - missing.length };
+}
 
 const EMPTY_REVIEW = {
   product_id: "", reviewer_name: "", rating: 5, comment: "", images: [], verified_purchase: false, is_approved: true, created_at: ""
@@ -148,11 +173,12 @@ export default function AdminDashboard() {
         video_url: product.video_url || "",
         price: product.price.toString(),
         discounted_price: product.discounted_price.toString(),
-        stock: product.stock || 100
+        stock: product.stock || 100,
+        seo: { ...EMPTY_SEO, ...(product.seo || {}) },
       });
     } else {
       setEditingProduct(null);
-      setProductForm(EMPTY_PRODUCT);
+      setProductForm({ ...EMPTY_PRODUCT, seo: { ...EMPTY_SEO } });
     }
     setShowProductForm(true);
   };
@@ -197,7 +223,16 @@ export default function AdminDashboard() {
         sizes: productForm.sizes.split(",").map(s => s.trim()).filter(Boolean),
         features: productForm.features.split(",").map(s => s.trim()).filter(Boolean),
         video_url: productForm.video_url || null,
-        stock: parseInt(productForm.stock)
+        stock: parseInt(productForm.stock),
+        seo: {
+          title: (productForm.seo?.title || "").trim(),
+          description: (productForm.seo?.description || "").trim(),
+          slug: (productForm.seo?.slug || "").trim(),
+          focus_keyword: (productForm.seo?.focus_keyword || "").trim(),
+          og_image: (productForm.seo?.og_image || "").trim(),
+          brand_name: (productForm.seo?.brand_name || "OHo Mart").trim(),
+          robots: (productForm.seo?.robots || "index, follow").trim(),
+        },
       };
       if (editingProduct) {
         const res = await axios.put(`${API}/products/${editingProduct.id}`, payload, getConfig());
@@ -416,6 +451,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
+      <Seo title="Admin Dashboard | OHo Mart" description="OHo Mart admin panel." canonicalPath="/admin/dashboard" robots="noindex, nofollow" />
       {/* Admin Header */}
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between sticky top-0 z-40" data-testid="admin-header">
         <div className="flex items-center gap-3">
@@ -481,6 +517,53 @@ export default function AdminDashboard() {
                     <p className="text-slate-400 text-sm mt-0.5">{label}</p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* SEO Health */}
+            {products.length > 0 && (
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-5 mb-6" data-testid="seo-health-card">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <SearchIcon className="w-5 h-5 text-sky-400" />
+                    <h3 className="font-bold text-white">SEO Health</h3>
+                  </div>
+                  <div className="flex gap-3 text-xs">
+                    <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:text-sky-300" data-testid="seo-sitemap-link">sitemap.xml</a>
+                    <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:text-sky-300" data-testid="seo-robots-link">robots.txt</a>
+                  </div>
+                </div>
+                {(() => {
+                  const totals = products.reduce(
+                    (acc, p) => {
+                      const h = seoHealth(p);
+                      const seo = p.seo || {};
+                      const hasFullSeo = (seo.title || "").trim().length >= 20 && (seo.description || "").trim().length >= 80;
+                      if (hasFullSeo) acc.full += 1;
+                      else acc.auto += 1;
+                      if (!p.images || p.images.length === 0) acc.noImg += 1;
+                      acc.total += 1;
+                      return acc;
+                    },
+                    { total: 0, full: 0, auto: 0, noImg: 0 }
+                  );
+                  const cells = [
+                    { label: "Total products", value: totals.total, color: "text-white" },
+                    { label: "Full manual SEO", value: totals.full, color: "text-green-400" },
+                    { label: "On auto defaults", value: totals.auto, color: "text-amber-400" },
+                    { label: "Missing images", value: totals.noImg, color: totals.noImg > 0 ? "text-red-400" : "text-slate-400" },
+                  ];
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {cells.map((c) => (
+                        <div key={c.label} className="bg-slate-900/60 rounded-xl p-3 border border-slate-700">
+                          <p className={`text-2xl font-black ${c.color}`}>{c.value}</p>
+                          <p className="text-xs text-slate-400 mt-1">{c.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -668,18 +751,34 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {products.map(p => {
                 const disc = Math.round(((p.price - p.discounted_price) / p.price) * 100);
+                const h = seoHealth(p);
+                const badge = h.score >= 4
+                  ? { cls: "bg-green-500 text-white", icon: Check, label: "SEO" }
+                  : h.score >= 2
+                  ? { cls: "bg-amber-500 text-white", icon: AlertCircle, label: "SEO" }
+                  : { cls: "bg-red-500 text-white", icon: X, label: "SEO" };
+                const BadgeIcon = badge.icon;
                 return (
                   <div key={p.id} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden" data-testid={`admin-product-${p.id}`}>
                     <div className="relative aspect-video bg-slate-700">
                       <img
                         src={p.images?.[0]}
                         alt={p.name}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=300"; }}
                       />
                       <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">-{disc}%</div>
                       <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full ${p.is_active ? "bg-green-500 text-white" : "bg-red-500 text-white"}`}>
                         {p.is_active ? "Active" : "Inactive"}
+                      </div>
+                      <div
+                        className={`absolute bottom-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${badge.cls}`}
+                        title={h.missing.length ? "Missing: " + h.missing.join(", ") : "All SEO basics covered"}
+                        data-testid={`admin-product-seo-badge-${p.id}`}
+                      >
+                        <BadgeIcon className="w-3 h-3" />
+                        {badge.label}
                       </div>
                     </div>
                     <div className="p-4">
@@ -1241,6 +1340,132 @@ export default function AdminDashboard() {
                     placeholder="Bladeless, 3 Speeds, USB-C"
                     className="w-full bg-slate-700 border border-slate-600 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
                 </div>
+                <div className="sm:col-span-2 mt-2 border border-slate-700 rounded-xl bg-slate-900/40">
+                  <details className="group" data-testid="seo-settings-panel">
+                    <summary className="cursor-pointer flex items-center justify-between px-4 py-3 select-none">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                        <SearchIcon className="w-4 h-4 text-sky-400" />
+                        SEO Settings <span className="text-xs text-slate-500 font-normal">(optional, overrides auto generated)</span>
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="border-t border-slate-700 p-4 space-y-3">
+                      <div>
+                        <div className="flex justify-between items-baseline">
+                          <label className="block text-xs font-semibold text-slate-300">SEO Title (max 60)</label>
+                          <span className={`text-[10px] font-mono ${ (productForm.seo?.title || "").length > 60 ? "text-red-400" : "text-slate-500"}`}>
+                            {(productForm.seo?.title || "").length}/60
+                          </span>
+                        </div>
+                        <input
+                          maxLength={60}
+                          value={productForm.seo?.title || ""}
+                          onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, title: e.target.value } }))}
+                          placeholder="Leave blank to auto generate from name"
+                          className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          data-testid="seo-title-input"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-baseline">
+                          <label className="block text-xs font-semibold text-slate-300">Meta Description (max 160)</label>
+                          <span className={`text-[10px] font-mono ${ (productForm.seo?.description || "").length > 160 ? "text-red-400" : "text-slate-500"}`}>
+                            {(productForm.seo?.description || "").length}/160
+                          </span>
+                        </div>
+                        <textarea
+                          maxLength={160}
+                          rows={2}
+                          value={productForm.seo?.description || ""}
+                          onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, description: e.target.value } }))}
+                          placeholder="Leave blank to auto generate. Write 140 to 160 characters in plain language."
+                          className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                          data-testid="seo-description-input"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300">URL Slug</label>
+                          <input
+                            value={productForm.seo?.slug || ""}
+                            onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, slug: slugify(e.target.value) } }))}
+                            placeholder="auto from name"
+                            className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid="seo-slug-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300">Focus Keyword (internal)</label>
+                          <input
+                            value={productForm.seo?.focus_keyword || ""}
+                            onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, focus_keyword: e.target.value } }))}
+                            placeholder="e.g. neck fan pakistan"
+                            className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid="seo-keyword-input"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-300">Open Graph Image URL (1200 by 630 recommended)</label>
+                          <input
+                            value={productForm.seo?.og_image || ""}
+                            onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, og_image: e.target.value } }))}
+                            placeholder="Overrides product first image for social shares"
+                            className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid="seo-og-image-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300">Schema Brand Name</label>
+                          <input
+                            value={productForm.seo?.brand_name || ""}
+                            onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, brand_name: e.target.value } }))}
+                            placeholder="OHo Mart"
+                            className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid="seo-brand-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300">Robots Directive</label>
+                          <select
+                            value={productForm.seo?.robots || "index, follow"}
+                            onChange={e => setProductForm(p => ({ ...p, seo: { ...p.seo, robots: e.target.value } }))}
+                            className="w-full mt-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            data-testid="seo-robots-input"
+                          >
+                            <option value="index, follow">index, follow (default)</option>
+                            <option value="noindex, nofollow">noindex, nofollow (hide from Google)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Google search result preview */}
+                      <div className="mt-3 pt-3 border-t border-slate-700">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Google Preview</p>
+                        {(() => {
+                          const previewProduct = {
+                            ...productForm,
+                            id: editingProduct?.id || "preview",
+                            seo: productForm.seo,
+                          };
+                          const r = resolveProductSeo(previewProduct);
+                          const previewUrl = `ohomart.online › product › ${r.slug || "name"}`;
+                          return (
+                            <div className="bg-white rounded-lg p-3 font-sans" data-testid="seo-google-preview">
+                              <p className="text-[11px] text-[#202124]">{previewUrl}</p>
+                              <p className="text-[#1a0dab] text-[18px] leading-tight font-normal hover:underline cursor-pointer" style={{ fontFamily: "arial, sans-serif" }}>
+                                {r.title}
+                              </p>
+                              <p className="text-[#4d5156] text-[13px] leading-snug mt-1">{r.description}</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </details>
+                </div>
+
                 <div className="sm:col-span-2 flex items-center gap-3">
                   <input type="checkbox" id="is_active" checked={productForm.is_active} onChange={e => setProductForm(p => ({ ...p, is_active: e.target.checked }))}
                     className="w-4 h-4 rounded" data-testid="product-active-input" />

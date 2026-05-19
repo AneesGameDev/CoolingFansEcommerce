@@ -5,6 +5,7 @@ import { Package, ArrowLeft, ShoppingBag } from "lucide-react";
 import Header from "../components/Header";
 import { useAuth } from "../contexts/AuthContext";
 import GoogleLoginButton from "../components/GoogleLoginButton";
+import Seo from "../seo/Seo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -33,13 +34,17 @@ export default function MyOrdersPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#F0F9FF]"><Header /><div className="p-12 text-center text-slate-500">Loading...</div></div>
+      <div className="min-h-screen bg-[#F0F9FF]">
+        <Seo title="My Orders | OHo Mart" description="Your OHo Mart order history." canonicalPath="/my-orders" robots="noindex, nofollow" />
+        <Header /><div className="p-12 text-center text-slate-500">Loading...</div>
+      </div>
     );
   }
 
   if (!user) {
     return (
       <div className="min-h-screen bg-[#F0F9FF]">
+        <Seo title="My Orders | OHo Mart" description="Sign in to view your OHo Mart order history." canonicalPath="/my-orders" robots="noindex, nofollow" />
         <Header />
         <div className="max-w-md mx-auto px-4 py-16 text-center" data-testid="my-orders-login-required">
           <div className="w-20 h-20 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -57,6 +62,7 @@ export default function MyOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F9FF]">
+      <Seo title="My Orders | OHo Mart" description="Your OHo Mart order history." canonicalPath="/my-orders" robots="noindex, nofollow" />
       <Header />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck, Search, Mail } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import Seo from "../seo/Seo";
 
 function buildWhatsAppText(order, trackingUrl) {
   const items = (order.items || [])
@@ -85,6 +87,7 @@ export default function OrderSuccessPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F9FF] flex items-center justify-center px-4 py-12">
+      <Seo title="Order Confirmed | OHo Mart" description="Your OHo Mart order has been received." canonicalPath="/order-success" robots="noindex, nofollow" />
       <div className="max-w-lg w-full">
         <div className="text-center mb-6 animate-fade-in-up">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">

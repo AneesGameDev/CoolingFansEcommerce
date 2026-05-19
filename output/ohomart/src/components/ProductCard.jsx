@@ -41,8 +41,11 @@ export default function ProductCard({ product, index = 0 }) {
         <img
           src={mainImage}
           alt={product.name}
+          width="400"
+          height="400"
           className={`w-full h-full object-cover transition-transform duration-500 hover:scale-105 ${soldOut ? "grayscale opacity-70" : ""}`}
           loading="lazy"
+          decoding="async"
           onError={(e) => { e.target.src = FALLBACK; }}
         />
 

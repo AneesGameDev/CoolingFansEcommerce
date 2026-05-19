@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import Seo from "../seo/Seo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const PROVINCES = ["Punjab", "Sindh", "KPK", "Balochistan", "AJK", "Gilgit-Baltistan", "ICT Islamabad"];
@@ -108,6 +109,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F9FF]">
+      <Seo title="Checkout | OHo Mart" description="Complete your OHo Mart order with cash on delivery." canonicalPath="/checkout" robots="noindex, nofollow" />
       <Header />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

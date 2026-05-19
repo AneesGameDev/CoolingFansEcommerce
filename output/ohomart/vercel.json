@@ -5,6 +5,10 @@
   "framework": "create-react-app",
   "installCommand": "yarn install",
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap.xml" },
+    { "source": "/robots.txt", "destination": "/api/robots.txt" },
+    { "source": "/api/sitemap.xml", "destination": "/api/sitemap.xml" },
+    { "source": "/api/robots.txt", "destination": "/api/robots.txt" },
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
@@ -12,6 +16,14 @@
     "api/index.js": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/sitemap.xml.js": {
+      "memory": 512,
+      "maxDuration": 15
+    },
+    "api/robots.txt.js": {
+      "memory": 256,
+      "maxDuration": 5
     }
   }
 }

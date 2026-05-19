@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { Wind, Shield, Star, ChevronRight, ChevronLeft, Truck, Package, RotateCcw, BadgeCheck, Plane, MessageCircle, Sparkles, Heart, ShieldCheck, Award, Quote, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -6,16 +6,19 @@ import Header from "../components/Header";
 import ProductCard from "../components/ProductCard";
 import CoolingFX from "../components/CoolingFX";
 import { useSiteSettings } from "../contexts/SiteSettingsContext";
+import Seo from "../seo/Seo";
+import { organizationSchema, websiteSchema, itemListSchema } from "../seo/schemas";
+import { siteOrigin, abs } from "../seo/site";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const PER_PAGE = 12;
 
 const WHY_BUY = [
-  { icon: Plane, title: "Directly Imported", desc: "Premium-grade fans straight from top factories. No local copies, no shortcuts — only the real thing.", color: "from-sky-400 to-blue-500" },
-  { icon: Truck, title: "1-2 Day Delivery", desc: "Lightning-fast nationwide delivery across Pakistan. Free shipping on orders over Rs. 2000.", color: "from-amber-400 to-orange-500" },
-  { icon: ShieldCheck, title: "7-Day Check Warranty", desc: "Open the box, test the fan, only pay if you're 100% happy with it.", color: "from-green-400 to-emerald-500" },
-  { icon: RotateCcw, title: "Easy Returns", desc: "Not satisfied? No questions asked. Return-back policy active on every order.", color: "from-rose-400 to-pink-500" },
-  { icon: BadgeCheck, title: "COD Only", desc: "Pay cash on delivery — no advance payment, no online fraud, total peace of mind.", color: "from-violet-400 to-purple-500" },
+  { icon: Plane, title: "Directly Imported", desc: "Premium grade fans straight from top factories. No local copies, no shortcuts. Only the real thing.", color: "from-sky-400 to-blue-500" },
+  { icon: Truck, title: "1-2 Day Delivery", desc: "Lightning fast nationwide delivery across Pakistan. Free shipping on orders over Rs. 2000.", color: "from-amber-400 to-orange-500" },
+  { icon: ShieldCheck, title: "7-Day Check Warranty", desc: "Open the box, test the fan, only pay if you are 100% happy with it.", color: "from-green-400 to-emerald-500" },
+  { icon: RotateCcw, title: "Easy Returns", desc: "Not satisfied? No questions asked. Return back policy active on every order.", color: "from-rose-400 to-pink-500" },
+  { icon: BadgeCheck, title: "COD Only", desc: "Pay cash on delivery. No advance payment, no online fraud, total peace of mind.", color: "from-violet-400 to-purple-500" },
   { icon: Award, title: "Quality Guaranteed", desc: "Every fan is tested before dispatch. We stand behind every product we ship.", color: "from-yellow-400 to-amber-500" },
 ];
 
@@ -63,8 +66,38 @@ export default function HomePage() {
 
   const testimonials = settings.featured_testimonials || [];
 
+  const seoBlocks = useMemo(() => {
+    const origin = siteOrigin();
+    const logo = abs("/manifest.json");
+    return [
+      organizationSchema({
+        siteUrl: origin,
+        logoUrl: logo,
+        whatsappNumber: settings.whatsapp_number,
+        sameAs: [],
+      }),
+      websiteSchema({ siteUrl: origin }),
+      products.length
+        ? itemListSchema({ products: products.slice(0, 24), siteUrl: origin })
+        : null,
+    ].filter(Boolean);
+  }, [products, settings.whatsapp_number]);
+
+  const homeTitle = "Imported Cooling Fans in Pakistan | OHo Mart";
+  const homeDescription =
+    "Shop imported neck fans, baby fans, desk fans and travel fans across Pakistan. Cash on delivery, 7 day check warranty, and fast 1 to 2 day shipping.";
+
   return (
     <div className="min-h-screen bg-[#F0F9FF]">
+      <Seo
+        title={homeTitle}
+        description={homeDescription}
+        canonicalPath="/"
+        ogImage={(products[0] && products[0].images && products[0].images[0]) || "/manifest.json"}
+        ogType="website"
+        robots="index, follow"
+        jsonLd={seoBlocks}
+      />
       <Header />
 
       {/* Hero Section with cooling animations — compact on mobile so products are visible quickly */}

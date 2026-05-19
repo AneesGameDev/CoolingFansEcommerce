@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ArrowLeft, ShoppingBag, Star, CheckCircle, Battery, Zap, Wind, X, Camera, Play, ShoppingCart, ShieldCheck, Truck, RotateCcw } from "lucide-react";
@@ -9,6 +9,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import GoogleLoginButton from "../components/GoogleLoginButton";
 import { toast } from "sonner";
+import Seo from "../seo/Seo";
+import { resolveProductSeo } from "../seo/seoDefaults";
+import { productSchema, breadcrumbSchema } from "../seo/schemas";
+import { siteOrigin } from "../seo/site";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const MAX_IMG_BYTES = 1.5 * 1024 * 1024; // 1.5MB cap per image
@@ -164,8 +168,25 @@ export default function ProductDetailPage() {
   const colorVariants = product.color_variants || [];
   const colorList = colorVariants.length > 0 ? colorVariants.map((v) => v.name) : (product.colors || []);
 
+  const seo = resolveProductSeo(product);
+  const origin = siteOrigin();
+  const productJsonLd = productSchema({ product, siteUrl: origin, reviews, brand: seo.brand });
+  const breadcrumbJsonLd = breadcrumbSchema([
+    { name: "Home", url: `${origin}/` },
+    { name: product.name, url: `${origin}/product/${product.id}` },
+  ]);
+
   return (
     <div className="min-h-screen bg-[#F0F9FF]">
+      <Seo
+        title={seo.title}
+        description={seo.description}
+        canonicalPath={`/product/${product.id}`}
+        ogImage={seo.ogImage}
+        ogType="product"
+        robots={seo.robots}
+        jsonLd={[productJsonLd, breadcrumbJsonLd]}
+      />
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -196,6 +217,9 @@ export default function ProductDetailPage() {
                 <img
                   src={product.images?.[selectedImage] || "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=600"}
                   alt={product.name}
+                  width="600"
+                  height="600"
+                  decoding="async"
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=600"; }}
                 />
@@ -224,7 +248,15 @@ export default function ProductDetailPage() {
                     className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${selectedImage === i && !showVideo ? "border-sky-500 shadow-md" : "border-slate-200"}`}
                     data-testid={`thumbnail-${i}`}
                   >
-                    <img src={img} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
+                    <img
+                      src={img}
+                      alt={i === 0 ? product.name : `${product.name} angle ${i + 1}`}
+                      width="64"
+                      height="64"
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
                   </button>
                 ))}
               </div>

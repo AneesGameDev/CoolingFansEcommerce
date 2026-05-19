@@ -9,6 +9,7 @@
 - Google Sign-In for customers, email+password auth for admins
 - Cash-on-Delivery checkout, order tracking, reviews, dynamic site content, WhatsApp button
 - **Automatic order confirmation:** branded email via Resend + one-tap WhatsApp confirmation to the buyer's own number with a deep-link to track the order
+- **Production-grade SEO:** per-page meta tags via react-helmet-async, JSON-LD structured data (Organization, WebSite, Product with reviews, BreadcrumbList, ItemList), dynamic `sitemap.xml` and `robots.txt` from serverless functions, admin SEO overrides with a live Google preview, and an SEO Health dashboard
 - Optional Resend (password-reset emails) — **no-ops when env vars are blank**
 
 ---
@@ -220,3 +221,85 @@ Vercel free-tier serverless body limit is ~4.5 MB. Image uploads (max 10 MB) and
 
 ## 9. License
 Proprietary — OHo Mart.
+
+---
+
+## 10. SEO Playbook for OHo Mart admin
+
+The codebase ships with every technical SEO concern already handled:
+unique titles and descriptions per page, canonical URLs, Open Graph and
+Twitter Card tags, JSON-LD structured data (Organization, WebSite,
+Product with aggregateRating + reviews, BreadcrumbList, ItemList), a
+dynamic `sitemap.xml` and `robots.txt`, lazy loaded images with width
+and height, manifest.json branded for installable PWA, and an admin SEO
+override panel with a live Google search preview.
+
+What follows is the off-code work the admin still has to do to actually
+rank in Google. Technical SEO without these steps will not move the
+needle.
+
+### A. One-time setup after deploy
+1. **Verify domain in Google Search Console.** Go to
+   https://search.google.com/search-console, add `ohomart.online`,
+   verify ownership via a DNS TXT record at your registrar. Wait for
+   verification to succeed.
+2. **Submit the sitemap.** In Search Console, open Sitemaps, enter
+   `sitemap.xml`, click Submit. Re-submit any time you launch a major
+   new section.
+3. **Submit to Bing Webmaster Tools.** https://www.bing.com/webmasters
+   accepts the same sitemap URL. Bing also feeds DuckDuckGo and Yahoo.
+4. **Register on Google Business Profile** (free). Add OHo Mart with
+   address (or service area), phone, hours, photos. This makes the
+   brand show up in Google Maps and in the "knowledge panel" for
+   branded searches.
+5. **Set up Google Search Console alerts** so you are emailed about
+   indexing problems or manual actions.
+
+### B. Per product, before publishing
+1. Write a **unique 200 to 300 word product description** in plain
+   language, focused on real benefits (not specs). Do not paste from
+   any AI tool. Google in 2026 penalizes mass produced AI product copy.
+2. Upload **3 or more original photos** per product, not stock images.
+   White background plus lifestyle shots beat generic Unsplash.
+3. In the admin product editor open the **SEO Settings** panel and
+   fill in:
+   - SEO Title (50 to 60 chars, include the search term you target)
+   - Meta Description (140 to 160 chars, written naturally)
+   - URL Slug (auto generated; override only if you have a strong
+     keyword reason)
+   - Focus Keyword (internal note for yourself, never output to page)
+   The live Google preview at the bottom of the form shows exactly how
+   the listing will look in search results.
+4. Use the **SEO badge** in the admin Products grid as a checklist:
+   green check means all basics are covered; yellow or red means
+   you should come back and fix something.
+
+### C. Ongoing
+1. **Encourage every delivered customer to leave a review.** Honest
+   reviews drive the `aggregateRating` schema which makes star ratings
+   appear in search results. Never fake reviews, Google will detect
+   patterns and penalize.
+2. **Write 1 or 2 short articles per month** (when you add a /blog
+   section) about practical questions buyers ask: how to charge a neck
+   fan, which fan is safest for newborns, etc.
+3. **Build backlinks** to ohomart.online. Practical ideas:
+   - Submit to Pakistani business directories (Pakistan Business
+     Directory, Yellow Pages PK, Aalmi Business Directory)
+   - Reach out to Pakistani lifestyle blogs for product reviews
+   - Partner with relevant micro influencers on Instagram and TikTok
+   - Get listed on local marketplace aggregators
+4. **Refresh top product descriptions** every 6 months. Google rewards
+   pages that stay current.
+
+### D. Realistic timelines
+- **Branded searches** ("ohomart", "oho mart neck fan") rank within
+  weeks of launch once the site is indexed.
+- **Long tail searches** ("usb desk fan price in karachi") take 2 to 4
+  months of consistent off page work.
+- **Competitive head terms** ("neck fan pakistan", "portable fan
+  online") realistically take 6 to 12 months of consistent backlink
+  building and review accumulation to reach page 1. New domains have
+  no authority and Google sandboxes them for the first few months.
+
+Be patient. Technical SEO is the foundation, but it is not magic.
+
