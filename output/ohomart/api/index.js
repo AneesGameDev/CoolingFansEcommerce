@@ -22,6 +22,90 @@ const {
 const { verifyGoogleIdToken, GOOGLE_CLIENT_ID } = require("./_lib/google");
 const { sendEmail } = require("./_lib/email");
 
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || "https://ohomart.online").replace(/\/$/, "");
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildOrderConfirmationEmail(order) {
+  const trackingUrl = `${PUBLIC_SITE_URL}/track?order=${encodeURIComponent(order.order_number)}`;
+  const itemsHtml = (order.items || [])
+    .map((it) => {
+      const color = it.selected_color ? ` • Color: ${escapeHtml(it.selected_color)}` : "";
+      const size = it.selected_size ? ` • Size: ${escapeHtml(it.selected_size)}` : "";
+      return `
+        <tr>
+          <td style="padding:12px 0;border-bottom:1px solid #E2E8F0;">
+            <table cellpadding="0" cellspacing="0" border="0"><tr>
+              <td valign="top" style="padding-right:12px;">
+                <img src="${escapeHtml(it.product_image || "")}" width="56" height="56" alt="" style="display:block;border-radius:8px;object-fit:cover;background:#F1F5F9;" />
+              </td>
+              <td valign="top">
+                <div style="font-size:14px;font-weight:700;color:#0F172A;">${escapeHtml(it.product_name)}</div>
+                <div style="font-size:12px;color:#64748B;margin-top:2px;">Qty: ${it.quantity}${color}${size}</div>
+              </td>
+              <td valign="top" align="right" style="font-size:14px;font-weight:700;color:#0EA5E9;">Rs. ${Math.round(it.line_total || it.unit_price * it.quantity).toLocaleString()}</td>
+            </tr></table>
+          </td>
+        </tr>`;
+    })
+    .join("");
+
+  return `
+  <div style="font-family:'Plus Jakarta Sans',Arial,sans-serif;background:#F0F9FF;padding:24px 0;color:#0F172A;">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;margin:0 auto;">
+      <tr><td style="background:linear-gradient(135deg,#0EA5E9,#06B6D4);padding:28px;border-radius:16px 16px 0 0;color:#fff;">
+        <div style="font-size:13px;opacity:.85;letter-spacing:1px;text-transform:uppercase;font-weight:700;">OHo Mart</div>
+        <div style="font-size:24px;font-weight:800;margin-top:6px;">Order Confirmed ✓</div>
+        <div style="font-size:14px;opacity:.9;margin-top:4px;">Thank you, ${escapeHtml(order.customer_name)} — we received your order.</div>
+      </td></tr>
+
+      <tr><td style="background:#fff;padding:24px;">
+        <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
+          <div style="font-size:11px;color:#0369A1;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Order Number</div>
+          <div style="font-size:20px;font-weight:900;color:#0EA5E9;font-family:'Courier New',monospace;margin-top:2px;">${escapeHtml(order.order_number)}</div>
+        </div>
+
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:18px;">${itemsHtml}</table>
+
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;">
+          <tr><td style="color:#64748B;padding:6px 0;">Phone</td><td align="right" style="color:#0F172A;font-weight:600;padding:6px 0;">${escapeHtml(order.phone)}</td></tr>
+          <tr><td style="color:#64748B;padding:6px 0;">WhatsApp</td><td align="right" style="color:#0F172A;font-weight:600;padding:6px 0;">${escapeHtml(order.whatsapp)}</td></tr>
+          <tr><td style="color:#64748B;padding:6px 0;">Delivery to</td><td align="right" style="color:#0F172A;font-weight:600;padding:6px 0;">${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.province ? ", " + escapeHtml(order.province) : ""}</td></tr>
+          <tr><td style="color:#64748B;padding:6px 0;">Payment</td><td align="right" style="color:#0F172A;font-weight:600;padding:6px 0;">Cash on Delivery</td></tr>
+          <tr><td colspan="2" style="border-top:1px solid #E2E8F0;padding-top:10px;margin-top:8px;"></td></tr>
+          <tr><td style="font-size:16px;font-weight:800;color:#0F172A;padding:10px 0 0;">Total</td><td align="right" style="font-size:20px;font-weight:900;color:#0EA5E9;padding:10px 0 0;">Rs. ${Math.round(order.total_price).toLocaleString()}</td></tr>
+        </table>
+
+        <div style="margin:22px 0;text-align:center;">
+          <a href="${trackingUrl}" style="display:inline-block;background:#0EA5E9;color:#fff;text-decoration:none;padding:14px 28px;border-radius:9999px;font-weight:800;font-size:15px;">
+            Track Your Order →
+          </a>
+        </div>
+
+        <div style="background:#F0F9FF;border-radius:12px;padding:16px;color:#0369A1;font-size:13px;line-height:1.6;">
+          <div style="font-weight:800;color:#0EA5E9;margin-bottom:6px;">What happens next?</div>
+          1. Our team will call you to confirm the order<br/>
+          2. Product will be dispatched within 1-2 days<br/>
+          3. You will receive tracking updates<br/>
+          4. Pay cash when you receive the delivery
+        </div>
+      </td></tr>
+
+      <tr><td style="background:#fff;padding:0 24px 24px;border-radius:0 0 16px 16px;border-top:1px solid #F1F5F9;text-align:center;font-size:12px;color:#94A3B8;padding-top:18px;">
+        Need help? Reply to this email or chat on WhatsApp.<br/>
+        OHo Mart • Pakistan's #1 Imported Fan Store
+      </td></tr>
+    </table>
+  </div>`;
+}
+
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "https://ohomart.online,https://www.ohomart.online")
   .split(",")
   .map((s) => s.trim())
@@ -393,6 +477,15 @@ router.post("/orders", optionalUser(getDb), asyncH(async (req, res) => {
       return null;
     })
   );
+
+  // Fire-and-forget order confirmation email (only if customer provided an email and Resend is configured)
+  if (data.email) {
+    sendEmail({
+      to: data.email,
+      subject: `Order Confirmed ✓  ${doc.order_number} — OHo Mart`,
+      html: buildOrderConfirmationEmail(doc),
+    }).catch((e) => console.error("order email failed:", e && e.message));
+  }
 
   res.json({ ...doc, id: result.insertedId.toString(), _id: undefined });
 }));

@@ -1,24 +1,80 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck, Search } from "lucide-react";
+import { CheckCircle, Package, MessageCircle, Home, ShoppingBag, Truck, Search, Mail } from "lucide-react";
+
+function buildWhatsAppText(order, trackingUrl) {
+  const items = (order.items || [])
+    .map((it) => `• ${it.product_name} x${it.quantity} — Rs. ${Math.round(it.line_total || it.unit_price * it.quantity).toLocaleString()}`)
+    .join("\n");
+  return (
+    `*OHo Mart — Order Confirmed*\n` +
+    `\n` +
+    `Order #: ${order.order_number}\n` +
+    `Customer: ${order.customer_name}\n` +
+    `Phone: ${order.phone}\n` +
+    `\n` +
+    `Items:\n${items}\n` +
+    `\n` +
+    `Total (COD): Rs. ${Math.round(order.total_price).toLocaleString()}\n` +
+    `Delivery: ${order.address}, ${order.city}${order.province ? ", " + order.province : ""}\n` +
+    `\n` +
+    `Track your order:\n${trackingUrl}\n` +
+    `\n` +
+    `Thank you for shopping with OHo Mart!`
+  );
+}
+
+// Normalize a Pakistani phone (e.g. 03001234567 → 923001234567) so wa.me accepts it.
+function normalizeWhatsAppNumber(raw) {
+  if (!raw) return "";
+  let n = String(raw).replace(/[^\d]/g, "");
+  if (n.startsWith("00")) n = n.slice(2);
+  if (n.startsWith("92")) return n;
+  if (n.startsWith("0")) return "92" + n.slice(1);
+  if (n.length === 10) return "92" + n; // bare PK mobile without leading 0
+  return n;
+}
 
 export default function OrderSuccessPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const autoOpenedRef = useRef(false);
+  const [waOpened, setWaOpened] = useState(false);
 
   useEffect(() => {
     if (!state?.order) navigate("/", { replace: true });
   }, [state, navigate]);
 
-  if (!state?.order) return null;
+  const order = state?.order;
 
-  const { order } = state;
+  const trackingUrl = useMemo(() => {
+    if (!order) return "";
+    return `${window.location.origin}/track?order=${encodeURIComponent(order.order_number)}`;
+  }, [order]);
+
+  const waHref = useMemo(() => {
+    if (!order) return "";
+    const phone = normalizeWhatsAppNumber(order.whatsapp || order.phone);
+    const text = encodeURIComponent(buildWhatsAppText(order, trackingUrl));
+    return `https://wa.me/${phone}?text=${text}`;
+  }, [order, trackingUrl]);
+
+  // Auto-open WhatsApp once on mount so the customer instantly sees the confirmation
+  // pre-filled in their own WhatsApp app — they just tap Send to save it in their chat.
+  useEffect(() => {
+    if (!order || autoOpenedRef.current || !waHref) return;
+    autoOpenedRef.current = true;
+    const t = setTimeout(() => {
+      try {
+        const win = window.open(waHref, "_blank", "noopener,noreferrer");
+        if (win) setWaOpened(true);
+      } catch (_) { /* popup blocked — user can still click the button */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [order, waHref]);
+
+  if (!order) return null;
   const items = order.items || [];
-
-  const itemSummary = items.map((it) => `${it.product_name} (x${it.quantity})`).join(", ");
-  const waMessage = encodeURIComponent(
-    `Hi OHo Mart! I just placed an order.\n\nOrder #: ${order.order_number}\nItems: ${itemSummary}\nTotal: Rs. ${order.total_price.toLocaleString()}\nName: ${order.customer_name}\nPhone: ${order.phone}\nAddress: ${order.address}, ${order.city}${order.province ? `, ${order.province}` : ""}`
-  );
 
   const statusColors = {
     pending: "bg-amber-100 text-amber-700",
@@ -34,10 +90,40 @@ export default function OrderSuccessPage() {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <h1 className="text-3xl font-black text-slate-900 mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
             Order Placed!
           </h1>
           <p className="text-slate-500">Thank you! Your order has been received successfully.</p>
+        </div>
+
+        {/* Confirmation channels banner */}
+        <div className="bg-white rounded-2xl border border-sky-100 p-4 mb-4 shadow-sm space-y-2" data-testid="confirmation-channels">
+          {order.email ? (
+            <div className="flex items-start gap-3 text-sm" data-testid="email-sent-row">
+              <div className="w-9 h-9 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-900">Confirmation email sent</p>
+                <p className="text-xs text-slate-500 truncate">to {order.email} — check your inbox (and spam).</p>
+              </div>
+            </div>
+          ) : null}
+          <div className="flex items-start gap-3 text-sm" data-testid="whatsapp-sent-row">
+            <div className="w-9 h-9 rounded-full bg-green-50 text-green-500 flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-900">
+                {waOpened ? "WhatsApp opened" : "Save confirmation to WhatsApp"}
+              </p>
+              <p className="text-xs text-slate-500">
+                {waOpened
+                  ? `Tap "Send" inside WhatsApp to save the confirmation to your ${order.whatsapp} chat.`
+                  : "Tap the green button below to open WhatsApp with your order details pre-filled."}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-sky-100 overflow-hidden mb-4 shadow-sm" data-testid="order-success-card">
@@ -52,7 +138,6 @@ export default function OrderSuccessPage() {
           </div>
 
           <div className="p-5">
-            {/* Items list */}
             <div className="space-y-3 mb-5 pb-5 border-b border-slate-100">
               {items.map((it, i) => (
                 <div key={i} className="flex gap-3" data-testid={`success-item-${i}`}>
@@ -99,7 +184,7 @@ export default function OrderSuccessPage() {
                 {[
                   "Our team will call you to confirm the order",
                   "Product will be dispatched within 1-2 days",
-                  "You will receive tracking info on WhatsApp",
+                  "Track updates anytime using the link below",
                   "Pay cash when you receive the delivery",
                 ].map((step, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-sky-700">
@@ -116,18 +201,18 @@ export default function OrderSuccessPage() {
 
         <div className="space-y-3">
           <a
-            href={`https://wa.me/923000000000?text=${waMessage}`}
+            href={waHref}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md"
             data-testid="whatsapp-confirm-btn"
           >
             <MessageCircle className="w-5 h-5" />
-            Confirm Order on WhatsApp
+            {waOpened ? "Re-open in WhatsApp" : "Send Confirmation to My WhatsApp"}
           </a>
 
           <Link
-            to="/track"
+            to={`/track?order=${encodeURIComponent(order.order_number)}`}
             className="w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
             data-testid="track-this-order-btn"
           >

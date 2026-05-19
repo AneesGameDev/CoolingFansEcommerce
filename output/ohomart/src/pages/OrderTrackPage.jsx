@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Search, Package, ArrowLeft, CheckCircle, Truck, Clock, AlertCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../components/Header";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -16,25 +16,40 @@ const STATUS_INFO = {
 
 export default function OrderTrackPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [orderNumber, setOrderNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
 
-  const handleTrack = async (e) => {
-    e.preventDefault();
-    if (!orderNumber.trim()) return;
+  const fetchOrder = useCallback(async (num) => {
+    if (!num) return;
     setLoading(true);
     setError("");
     setOrder(null);
     try {
-      const r = await axios.get(`${API}/orders/track/${orderNumber.trim()}`);
+      const r = await axios.get(`${API}/orders/track/${num}`);
       setOrder(r.data);
     } catch (err) {
       setError(err.response?.status === 404 ? "Order not found. Please check your order number." : "Something went wrong. Try again.");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-track when the page is opened with ?order=CB-XXX
+  useEffect(() => {
+    const q = searchParams.get("order");
+    if (q) {
+      const n = q.trim().toUpperCase();
+      setOrderNumber(n);
+      fetchOrder(n);
+    }
+  }, [searchParams, fetchOrder]);
+
+  const handleTrack = async (e) => {
+    e.preventDefault();
+    fetchOrder(orderNumber.trim());
   };
 
   const statusInfo = order ? (STATUS_INFO[order.status] || STATUS_INFO.pending) : null;

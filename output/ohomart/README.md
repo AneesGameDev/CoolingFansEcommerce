@@ -8,6 +8,7 @@
 - Self-seeding on first DB connect (indexes + default products + admins + site settings)
 - Google Sign-In for customers, email+password auth for admins
 - Cash-on-Delivery checkout, order tracking, reviews, dynamic site content, WhatsApp button
+- **Automatic order confirmation:** branded email via Resend + one-tap WhatsApp confirmation to the buyer's own number with a deep-link to track the order
 - Optional Resend (password-reset emails) — **no-ops when env vars are blank**
 
 ---
@@ -61,6 +62,7 @@ Click **Environment Variables**, then add each row below. Apply to **Production,
 | `CORS_ORIGINS` | `https://ohomart.online,https://www.ohomart.online` | Allowed origins for the API |
 | `COOKIE_DOMAIN` | `.ohomart.online` | Leading dot lets the cookie work on `www.` subdomain too |
 | `WHATSAPP_NUMBER` | `923000000000` | With country code, **no `+`** — used by the floating WhatsApp button |
+| `PUBLIC_SITE_URL` | `https://ohomart.online` | Used to build the tracking link inside order confirmation emails |
 | `REACT_APP_BACKEND_URL` | _(leave empty)_ | Empty value → frontend calls `/api/...` on the same domain |
 | `REACT_APP_GOOGLE_CLIENT_ID` | _same as `GOOGLE_CLIENT_ID`_ | Build-time variable for the React app |
 | `RESEND_API_KEY` | (optional) | Enables password-reset emails |
@@ -118,6 +120,19 @@ Done. Visit `https://ohomart.online`.
 ---
 
 ## 5. Optional Features
+
+### Order Confirmation: Email + WhatsApp (FREE, no Twilio)
+After the customer places an order on `/checkout`, the app automatically:
+
+1. **Emails the buyer** a beautifully-branded order-confirmation email via Resend — order number, itemized list, total, delivery address, and a one-tap **"Track Your Order →"** button that links to `/track?order=<order_number>`. *Requires `RESEND_API_KEY` + `SENDER_EMAIL`; silently skipped when blank.*
+2. **Opens WhatsApp on the buyer's phone** (via a `wa.me/<their_number>?text=...` deep link) with the full order summary + tracking link pre-filled. The customer taps "Send" once and the confirmation lands permanently in their own WhatsApp chat — **for free, no Twilio, no WhatsApp Business API, no monthly fees.**
+
+How the WhatsApp half works (since there's no truly free server-to-WhatsApp send):
+- The `/order-success` page calls `window.open("https://wa.me/<customer_whatsapp>?text=<encoded_order>")` 800 ms after rendering
+- The customer's WhatsApp opens to a chat with **themselves**, message pre-filled, ready to send
+- They tap Send → the confirmation is now in their WhatsApp inbox, persisted forever, searchable
+- If the popup is blocked, a prominent green **"Send Confirmation to My WhatsApp"** button on the success page does the same thing on demand
+- The tracking link `https://ohomart.online/track?order=CB-XXX...` is **deep-linkable** — the `/track` page auto-fetches when opened with the query param
 
 ### Password-Reset Emails (Resend)
 - Add `RESEND_API_KEY` and `SENDER_EMAIL` to env vars
