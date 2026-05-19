@@ -21,7 +21,6 @@ const {
 } = require("./_lib/auth");
 const { verifyGoogleIdToken, GOOGLE_CLIENT_ID } = require("./_lib/google");
 const { sendEmail } = require("./_lib/email");
-const { notifyAdminNewOrder, WHATSAPP_AUTO_REPLY } = require("./_lib/whatsapp");
 
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "https://ohomart.online,https://www.ohomart.online")
   .split(",")
@@ -394,8 +393,6 @@ router.post("/orders", optionalUser(getDb), asyncH(async (req, res) => {
       return null;
     })
   );
-  // Fire-and-forget admin WhatsApp notify
-  notifyAdminNewOrder(doc).catch((e) => console.error("notify admin failed:", e && e.message));
 
   res.json({ ...doc, id: result.insertedId.toString(), _id: undefined });
 }));
@@ -618,39 +615,6 @@ router.get("/admin/stats", requireAdmin(getDb), asyncH(async (req, res) => {
   ]);
   const total_revenue = all_orders.reduce((s, o) => s + (Number(o.total_price) || 0), 0);
   res.json({ total_orders, pending_orders, total_products, total_reviews, total_revenue });
-}));
-
-// ---- WhatsApp Webhook ----
-router.post("/whatsapp/webhook", asyncH(async (req, res) => {
-  try {
-    const db = await getDb();
-    await db.collection("whatsapp_messages").insertOne({
-      direction: "inbound",
-      from: req.body.From || "",
-      body: req.body.Body || "",
-      twilio_sid: req.body.MessageSid || "",
-      received_at: new Date().toISOString(),
-    });
-  } catch (e) {
-    console.error("whatsapp webhook DB err:", e && e.message);
-  }
-  const reply = WHATSAPP_AUTO_REPLY;
-  const xml =
-    '<?xml version="1.0" encoding="UTF-8"?>' +
-    "<Response>" +
-    `<Message>${reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</Message>` +
-    "</Response>";
-  res.setHeader("Content-Type", "application/xml");
-  res.send(xml);
-}));
-
-router.get("/admin/whatsapp-messages", requireAdmin(getDb), asyncH(async (req, res) => {
-  const msgs = await req.db.collection("whatsapp_messages")
-    .find({ direction: "inbound" })
-    .sort({ received_at: -1 })
-    .limit(500)
-    .toArray();
-  res.json(msgs.map(docToDict));
 }));
 
 // Mount router on /api so Vercel's rewrite (which preserves the path) lands here correctly.

@@ -8,7 +8,7 @@
 - Self-seeding on first DB connect (indexes + default products + admins + site settings)
 - Google Sign-In for customers, email+password auth for admins
 - Cash-on-Delivery checkout, order tracking, reviews, dynamic site content, WhatsApp button
-- Optional Resend (password-reset emails) and Twilio (WhatsApp notifications) — **no-ops when env vars are blank**
+- Optional Resend (password-reset emails) — **no-ops when env vars are blank**
 
 ---
 
@@ -21,7 +21,6 @@
 | MongoDB Atlas free cluster | https://cloud.mongodb.com (M0 free tier, no card) |
 | Google OAuth Client ID | https://console.cloud.google.com → APIs & Services → Credentials |
 | (Optional) Resend API key | https://resend.com/api-keys |
-| (Optional) Twilio WhatsApp | https://www.twilio.com/console |
 
 ---
 
@@ -66,11 +65,6 @@ Click **Environment Variables**, then add each row below. Apply to **Production,
 | `REACT_APP_GOOGLE_CLIENT_ID` | _same as `GOOGLE_CLIENT_ID`_ | Build-time variable for the React app |
 | `RESEND_API_KEY` | (optional) | Enables password-reset emails |
 | `SENDER_EMAIL` | `noreply@ohomart.online` | Must match a verified domain in Resend |
-| `TWILIO_ACCOUNT_SID` | (optional) | Enables WhatsApp order alerts + auto-reply |
-| `TWILIO_AUTH_TOKEN` | (optional) | |
-| `TWILIO_WHATSAPP_FROM` | `whatsapp:+14155238886` | Twilio sandbox or your business number |
-| `ADMIN_WHATSAPP_NOTIFY` | `whatsapp:+92xxxxxxxxxx` | Where to send new-order alerts |
-| `WHATSAPP_AUTO_REPLY` | _custom message_ | Auto-reply to customers |
 
 A full reference list lives in **`.env.example`**.
 
@@ -130,16 +124,9 @@ Done. Visit `https://ohomart.online`.
 - Verify `ohomart.online` in Resend → Domains
 - "Forgot password?" on `/admin` will email a 6-digit reset code
 
-### WhatsApp Order Notifications + Auto-Reply (Twilio)
-1. Get `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` from https://www.twilio.com/console
-2. Activate the WhatsApp Sandbox or get an approved business sender
-3. Set:
-   - `TWILIO_WHATSAPP_FROM=whatsapp:+14155238886` (sandbox) or your approved number
-   - `ADMIN_WHATSAPP_NOTIFY=whatsapp:+92xxxxxxxxxx` (your phone)
-4. In Twilio Console → Messaging → your number → **"A message comes in"** webhook (HTTP POST):
-   `https://ohomart.online/api/whatsapp/webhook`
+**Leave the env vars blank to disable — the app keeps working.**
 
-**Leave these env vars blank to disable both features — the app keeps working.**
+The floating **WhatsApp button** on the storefront opens `https://wa.me/<WHATSAPP_NUMBER>` directly in the customer's WhatsApp app — no third-party integration, no webhook, no backend required.
 
 ---
 
@@ -176,8 +163,7 @@ ohomart/
 │       ├── seed.js           # Idempotent self-seeding (indexes, admins, products, settings)
 │       ├── auth.js           # JWT + bcrypt + cookie helpers, requireAdmin / requireUser middleware
 │       ├── google.js         # Google ID token verification (google-auth-library)
-│       ├── email.js          # Resend send wrapper (no-op when blank)
-│       └── whatsapp.js       # Twilio send + order-notify (no-op when blank)
+│       └── email.js          # Resend send wrapper (no-op when blank)
 ├── src/                      # React app
 ├── public/                   # CRA public assets
 ├── vercel.json               # Rewrites /api/* → api/index.js, SPA fallback
